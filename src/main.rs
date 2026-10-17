@@ -56,6 +56,11 @@ fn load_app_icon() -> Option<tao::window::Icon> {
     tao::window::Icon::from_rgba(ICON_RGBA.to_vec(), 32, 32).ok()
 }
 
+fn load_tray_icon() -> Option<tray_icon::Icon> {
+    const ICON_RGBA: &[u8] = include_bytes!("app_icon.rgba");
+    tray_icon::Icon::from_rgba(ICON_RGBA.to_vec(), 32, 32).ok()
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 1. Start media streaming server on 127.0.0.1 (assigned free port)
     let media_server_url = start_media_server();
@@ -64,6 +69,35 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 2. Initialize Tao Event Loop with UserEvent support
     let event_loop = EventLoopBuilder::<UserEvent>::with_user_event().build();
     let proxy = event_loop.create_proxy();
+
+    // Set up tray event forwarding to Tao event loop
+    let proxy_tray = proxy.clone();
+    tray_icon::TrayIconEvent::set_event_handler(Some(move |event| {
+        let _ = proxy_tray.send_event(UserEvent::TrayIconEvent(event));
+    }));
+
+    let proxy_menu = proxy.clone();
+    tray_icon::menu::MenuEvent::set_event_handler(Some(move |event| {
+        let _ = proxy_menu.send_event(UserEvent::MenuEvent(event));
+    }));
+
+    // Create system tray menu
+    let tray_menu = tray_icon::menu::Menu::new();
+    let show_item = tray_icon::menu::MenuItem::new("Открыть ClipForge", true, None);
+    let quit_item = tray_icon::menu::MenuItem::new("Выход", true, None);
+    let show_id = show_item.id().clone();
+    let quit_id = quit_item.id().clone();
+    let _ = tray_menu.append_items(&[&show_item, &quit_item]);
+
+    let mut tray_builder = tray_icon::TrayIconBuilder::new()
+        .with_menu(Box::new(tray_menu))
+        .with_tooltip("ClipForge ⚡");
+
+    if let Some(tray_icon_img) = load_tray_icon() {
+        tray_builder = tray_builder.with_icon(tray_icon_img);
+    }
+
+    let _tray_icon = tray_builder.build()?;
 
     // 3. Build native desktop window
     let mut window_builder = WindowBuilder::new()
@@ -126,12 +160,34 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Event::UserEvent(UserEvent::EvalJs(script)) => {
                 let _ = webview.evaluate_script(&script);
             }
+            Event::UserEvent(UserEvent::TrayIconEvent(tray_event)) => {
+                match tray_event {
+                    tray_icon::TrayIconEvent::Click {
+                        button: tray_icon::MouseButton::Left,
+                        button_state: tray_icon::MouseButtonState::Up,
+                        ..
+                    } => {
+                        window.set_visible(true);
+                        window.set_focus();
+                    }
+                    _ => {}
+                }
+            }
+            Event::UserEvent(UserEvent::MenuEvent(menu_event)) => {
+                if menu_event.id == show_id {
+                    window.set_visible(true);
+                    window.set_focus();
+                } else if menu_event.id == quit_id {
+                    api_exit.cancel();
+                    *control_flow = ControlFlow::Exit;
+                }
+            }
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
                 ..
             } => {
-                api_exit.cancel();
-                *control_flow = ControlFlow::Exit;
+                // Вместо выхода из программы скрываем окно в трей
+                window.set_visible(false);
             }
             _ => (),
         }

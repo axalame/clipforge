@@ -20,6 +20,8 @@ const CREATE_NO_WINDOW: u32 = 0x08000000;
 #[derive(Debug)]
 pub enum UserEvent {
     EvalJs(String),
+    TrayIconEvent(tray_icon::TrayIconEvent),
+    MenuEvent(tray_icon::menu::MenuEvent),
 }
 
 pub struct ApiCallbacks {
