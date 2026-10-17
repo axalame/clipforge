@@ -1,0 +1,21 @@
+{
+  "queue_files": "Файлы очереди",
+  "clear_all": "Очистить все",
+  "delete_from_queue": "Удалить из очереди",
+  "queue_empty": "Очередь пуста.\nНажмите «+ Добавить файлы» сверху.",
+  "select_video_left": "Выберите видеофайл слева для запуска в плеере",
+  "tech_specs": "Технические характеристики видеопотока",
+  "in_windows_player": "В плеере Windows",
+  "inspect_placeholder": "Выберите видеофайл слева для инспекции параметров",
+  "duration": "Длительность:",
+  "resolution": "Разрешение:",
+  "video_codec": "Видеокодек:",
+  "framerate": "Частота кадров (FPS):",
+  "audio_codec": "Аудиокодек:",
+  "bitrate_size": "Битрейт / Размер:",
+  "format_requires_player": "Формат видео требует внешний плеер:",
+  "show_in_explorer": "Показать в проводнике",
+  "loading_metadata": "Загрузка метаданных потока...",
+  "container_label": "Контейнер:",
+  "added_files_to_queue": "Добавлено файлов в очередь: "
+}

@@ -1,0 +1,21 @@
+{
+  "queue_files": "Queue Files",
+  "clear_all": "Clear All",
+  "delete_from_queue": "Remove from queue",
+  "queue_empty": "Queue is empty.\nClick \"+ Add files\" at the top.",
+  "select_video_left": "Select a video file on the left to play",
+  "tech_specs": "Technical Stream Specifications",
+  "in_windows_player": "In Windows Player",
+  "inspect_placeholder": "Select a video file on the left to inspect parameters",
+  "duration": "Duration:",
+  "resolution": "Resolution:",
+  "video_codec": "Video Codec:",
+  "framerate": "Frame Rate (FPS):",
+  "audio_codec": "Audio Codec:",
+  "bitrate_size": "Bitrate / Size:",
+  "format_requires_player": "Video format requires external player:",
+  "show_in_explorer": "Show in Explorer",
+  "loading_metadata": "Loading stream metadata...",
+  "container_label": "Container:",
+  "added_files_to_queue": "Added files to queue: "
+}

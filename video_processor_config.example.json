@@ -1,0 +1,9 @@
+{
+  "ffmpeg_dir": "",
+  "ytdlp_path": "",
+  "deno_path": "",
+  "ytdlp_channel": "Stable",
+  "cookie_source": "none",
+  "cookie_file": "",
+  "output_dir": "downloads"
+}

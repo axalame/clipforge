@@ -1,0 +1,49 @@
+# ==========================================
+# Video Studio Pro - Git Ignore
+# ==========================================
+
+# 1. Local Configuration & Secrets (CRITICAL)
+video_processor_config.json
+*.local.json
+.env
+.env.*
+!.env.example
+*.cookies.txt
+cookies.txt
+
+# 2. Rust & Cargo Build Artifacts
+/target/
+**/*.rs.bk
+Cargo.lock.temp
+
+# 3. Node & Frontend Artifacts
+/frontend/node_modules/
+/frontend/dist/
+frontend/*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# 4. Local Binaries & Runtime Cache
+video_studio.exe
+video_studio.exe.WebView2/
+*.WebView2/
+*.pdb
+
+# 5. Media Downloads & Generated Working Files
+/downloads/
+concat_list_*.txt
+drawtext_overlay_*.txt
+
+# 6. OS & IDE Metadata
+.DS_Store
+Thumbs.db
+desktop.ini
+*.tmp
+*.bak
+*.swp
+.idea/
+.vscode/
+*.suo
+*.user
