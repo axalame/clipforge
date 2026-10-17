@@ -590,8 +590,15 @@
     /* Content Area */
     .studio-content-scroll {
       flex: 1;
-      overflow-y: auto;
+      overflow-y: scroll;
+      scrollbar-gutter: stable;
       padding: 24px 32px;
+    }
+    .yt-tab-pane {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      min-height: 480px;
     }
     .studio-container {
       max-width: 900px;
@@ -649,16 +656,17 @@
       margin-bottom: 20px;
     }
     .subtab-btn {
-      padding: 7px 18px;
+      padding: 6px 17px;
       border-radius: 9999px;
       font-size: 12px;
       font-weight: 500;
       color: var(--text-sub);
       cursor: pointer;
-      transition: all 0.2s ease;
+      transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
       background: transparent;
       border: 1px solid transparent;
       outline: none;
+      box-sizing: border-box;
     }
     .subtab-btn:hover {
       color: var(--text-main);
@@ -668,7 +676,7 @@
       background: rgba(16, 185, 129, 0.16);
       border-color: rgba(16, 185, 129, 0.35);
       color: #34d399;
-      font-weight: 600;
+      font-weight: 500;
       box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
     }
 
@@ -1488,13 +1496,15 @@
       display: inline-flex;
       align-items: center;
       gap: 7px;
-      padding: 7px 18px;
+      padding: 6px 17px;
+      border: 1px solid transparent;
+      box-sizing: border-box;
       border-radius: 9999px;
       font-size: 13px;
       font-weight: 500;
       color: var(--text-sub);
       cursor: pointer;
-      transition: all 0.2s ease;
+      transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
       user-select: none;
     }
     .yt-header-tab:hover {
@@ -1507,8 +1517,8 @@
     .yt-header-tab.is-active {
       background: rgba(16, 185, 129, 0.16);
       color: #10b981;
-      font-weight: 600;
-      border: 1px solid rgba(16, 185, 129, 0.3);
+      font-weight: 500;
+      border-color: rgba(16, 185, 129, 0.35);
     }
     body.theme-light .yt-header-tab.is-active {
       background: #ffffff;
@@ -1551,7 +1561,7 @@
     }
     .history-filter-item.is-active {
       color: #10b981;
-      font-weight: 600;
+      font-weight: 500;
     }
     .history-filter-item.is-active::after {
       content: "";

@@ -21,7 +21,7 @@
     </div>
 
     <!-- 1.1 TAB: DOWNLOAD (URL Input & Config) -->
-    <div v-if="ytSubNav === 'download'" style="display:flex; flex-direction:column; gap:16px;">
+    <div v-show="ytSubNav === 'download'" class="yt-tab-pane">
       <!-- STEP 1: BEFORE URL ANALYSIS -->
       <div v-if="!ytVideoMeta" class="yt-welcome-container">
         <div class="yt-welcome-title">{{ t('welcome_title') }}</div>
@@ -263,7 +263,7 @@
     </div>
 
     <!-- 1.2 TAB: PENDING (Active tasks) -->
-    <div v-else-if="ytSubNav === 'pending'" style="display:flex; flex-direction:column; gap:16px;">
+    <div v-show="ytSubNav === 'pending'" class="yt-tab-pane">
       <div v-if="pendingTasks.length === 0" class="history-empty-view">
         <div class="empty-icon-box">
           <svg viewBox="0 0 24 24" width="30" height="30" stroke="currentColor" stroke-width="1.8" fill="none">
@@ -312,7 +312,7 @@
     </div>
 
     <!-- 1.3 TAB: HISTORY -->
-    <div v-else-if="ytSubNav === 'history'" style="display:flex; flex-direction:column; gap:16px;">
+    <div v-show="ytSubNav === 'history'" class="yt-tab-pane">
       <!-- Filter Sub-Tabs Bar (Matching Screenshot) -->
       <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:2px;">
         <div class="history-filter-bar" style="border-bottom:none; margin-bottom:0; flex:1;">
