@@ -58,7 +58,23 @@ fn load_app_icon() -> Option<tao::window::Icon> {
 
 fn load_tray_icon() -> Option<tray_icon::Icon> {
     const ICON_RGBA: &[u8] = include_bytes!("app_icon.rgba");
-    tray_icon::Icon::from_rgba(ICON_RGBA.to_vec(), 32, 32).ok()
+    match tray_icon::Icon::from_rgba(ICON_RGBA.to_vec(), 32, 32) {
+        Ok(icon) => Some(icon),
+        Err(e) => {
+            eprintln!("Failed to load tray icon: {}", e);
+            None
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_load_tray_icon_rgba() {
+        assert!(load_tray_icon().is_some());
+    }
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -91,13 +107,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut tray_builder = tray_icon::TrayIconBuilder::new()
         .with_menu(Box::new(tray_menu))
-        .with_tooltip("ClipForge ⚡");
+        .with_tooltip("ClipForge ⚡")
+        .with_menu_on_left_click(false);
 
     if let Some(tray_icon_img) = load_tray_icon() {
         tray_builder = tray_builder.with_icon(tray_icon_img);
     }
 
-    let _tray_icon = tray_builder.build()?;
+    let tray_icon = tray_builder.build()?;
 
     // 3. Build native desktop window
     let mut window_builder = WindowBuilder::new()
@@ -154,6 +171,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 6. Run native Tao event loop
     event_loop.run(move |event, _, control_flow| {
+        let _keep_tray_alive = &tray_icon;
         *control_flow = ControlFlow::Wait;
 
         match event {
@@ -166,8 +184,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         button: tray_icon::MouseButton::Left,
                         button_state: tray_icon::MouseButtonState::Up,
                         ..
+                    }
+                    | tray_icon::TrayIconEvent::DoubleClick {
+                        button: tray_icon::MouseButton::Left,
+                        ..
                     } => {
                         window.set_visible(true);
+                        window.set_minimized(false);
                         window.set_focus();
                     }
                     _ => {}
@@ -176,6 +199,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Event::UserEvent(UserEvent::MenuEvent(menu_event)) => {
                 if menu_event.id == show_id {
                     window.set_visible(true);
+                    window.set_minimized(false);
                     window.set_focus();
                 } else if menu_event.id == quit_id {
                     api_exit.cancel();
