@@ -324,7 +324,7 @@
           </span>
         </div>
         <div class="tool-top-actions">
-          <n-button size="small" secondary @click="checkAppUpdate" :loading="isCheckingAppUpdate">
+          <n-button size="small" secondary @click="() => checkAppUpdate(false)" :loading="isCheckingAppUpdate">
             {{ t('check_for_updates', 'Проверить обновления') }}
           </n-button>
           <n-button v-if="appUpdateInfo?.has_update" size="small" type="primary" @click="installAppUpdate" :loading="isInstallingAppUpdate">
@@ -340,7 +340,7 @@
       <div class="tool-meta-grid">
         <div class="tool-meta-row">
           <span class="meta-label">{{ t('current_version', 'Текущая версия') }}</span>
-          <span class="meta-value">v{{ appUpdateInfo?.current_version || '0.2.1' }}</span>
+          <span class="meta-value">v{{ appUpdateInfo?.current_version || config.app_version || '0.3.0' }}</span>
         </div>
         <div v-if="appUpdateInfo?.latest_version" class="tool-meta-row">
           <span class="meta-label">{{ t('latest_version', 'Последняя версия') }}</span>
@@ -387,6 +387,7 @@ const denoSource = ref("builtin");
 const ffmpegSource = ref("builtin");
 
 const config = ref<any>({
+  app_version: "0.3.0",
   ffmpeg_dir: "ffmpeg",
   ytdlp_path: "yt-dlp",
   deno_path: "deno",
@@ -427,7 +428,7 @@ const loadConfig = async () => {
   try {
     const data: any = await apiClient.getConfig();
     if (data) {
-      config.value = data;
+      config.value = { ...config.value, ...data };
     }
     await configStore.fetchConfig();
   } catch (e) {
@@ -513,22 +514,27 @@ const checkFfmpegUpdate = async () => {
   }
 };
 
-const checkAppUpdate = async () => {
+const checkAppUpdate = async (silentParam?: boolean | Event) => {
+  const silent = typeof silentParam === "boolean" ? silentParam : false;
   isCheckingAppUpdate.value = true;
   try {
     const res = await apiClient.checkAppUpdate();
     if (res && res.ok) {
       appUpdateInfo.value = res;
-      if (res.has_update) {
-        message.info(res.msg);
-      } else {
-        message.success(res.msg);
+      if (!silent) {
+        if (res.has_update) {
+          message.info(res.msg);
+        } else {
+          message.success(res.msg);
+        }
       }
-    } else {
+    } else if (!silent) {
       message.error(res?.msg || "Ошибка проверки обновлений");
     }
   } catch (e: any) {
-    message.error("Сбой сети: " + (e.message || e));
+    if (!silent) {
+      message.error("Сбой сети: " + (e.message || e));
+    }
   } finally {
     isCheckingAppUpdate.value = false;
   }
@@ -615,5 +621,6 @@ const openOutputDir = () => {
 
 onMounted(() => {
   loadConfig();
+  checkAppUpdate(true);
 });
 </script>

@@ -339,6 +339,7 @@ impl Api {
         let cfg = AppConfig::load();
         let tools = cfg.validate_tools();
         json!({
+            "app_version": env!("CARGO_PKG_VERSION"),
             "ffmpeg_dir": cfg.ffmpeg_dir,
             "ytdlp_path": cfg.ytdlp_path,
             "deno_path": cfg.deno_path,
