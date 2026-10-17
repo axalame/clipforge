@@ -178,6 +178,16 @@ class ApiClient {
     if (name === "deno") return this.checkDenoUpdate();
     return this.checkFfmpegUpdate();
   }
+
+  async checkAppUpdate(): Promise<any> {
+    if (!this.rawApi) return { ok: false, msg: "API недоступно" };
+    return this.rawApi.check_app_update();
+  }
+
+  async installAppUpdate(downloadUrl: string): Promise<any> {
+    if (!this.rawApi) return { ok: false, msg: "API недоступно" };
+    return this.rawApi.install_app_update(downloadUrl);
+  }
 }
 
 export const apiClient = new ApiClient();

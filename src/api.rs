@@ -134,6 +134,11 @@ impl Api {
             "update_ytdlp" => self.update_ytdlp(),
             "check_deno_update" => self.check_deno_update(),
             "check_ffmpeg_update" => self.check_ffmpeg_update(),
+            "check_app_update" => self.check_app_update(),
+            "install_app_update" => {
+                let url = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
+                self.install_app_update(url)
+            }
             "cancel" => self.cancel(),
             _ => json!({ "error": format!("Неизвестный RPC метод: {}", method) }),
         }
@@ -225,6 +230,107 @@ impl Api {
             Ok(_) => json!({ "ok": false, "msg": "Сервер обновлений FFmpeg временно недоступен" }),
             Err(e) => json!({ "ok": false, "msg": format!("Ошибка проверки: {}", e) }),
         }
+    }
+
+    fn check_app_update(&self) -> Value {
+        let repo = "axalame/video-studio-pro";
+        let url = format!("https://api.github.com/repos/{}/releases/latest", repo);
+
+        let mut cmd = Command::new("curl.exe");
+        #[cfg(windows)]
+        cmd.creation_flags(CREATE_NO_WINDOW);
+        cmd.args(["-s", "--max-time", "10", "-H", "User-Agent: VideoStudioPro-App", &url]);
+
+        let output = match cmd.output() {
+            Ok(o) if o.status.success() => o,
+            _ => return json!({ "ok": false, "msg": "Не удалось связаться с сервером обновлений GitHub" }),
+        };
+
+        let body_str = String::from_utf8_lossy(&output.stdout);
+        let release: Value = match serde_json::from_str(&body_str) {
+            Ok(v) => v,
+            Err(_) => return json!({ "ok": false, "msg": "Некорректный ответ от GitHub Releases" }),
+        };
+
+        let tag_name = release["tag_name"].as_str().unwrap_or("").trim_start_matches('v');
+        let current_version = env!("CARGO_PKG_VERSION");
+
+        let parse_ver = |v: &str| -> Vec<u32> {
+            v.split('.')
+                .filter_map(|s| s.chars().take_while(|c| c.is_ascii_digit()).collect::<String>().parse().ok())
+                .collect()
+        };
+
+        let has_update = parse_ver(tag_name) > parse_ver(current_version);
+        let mut download_url = String::new();
+        let mut asset_size = 0u64;
+
+        if let Some(assets) = release["assets"].as_array() {
+            for asset in assets {
+                let name = asset["name"].as_str().unwrap_or("");
+                if name.ends_with("-setup.exe") || name.ends_with(".exe") {
+                    download_url = asset["browser_download_url"].as_str().unwrap_or("").to_string();
+                    asset_size = asset["size"].as_u64().unwrap_or(0);
+                    break;
+                }
+            }
+        }
+
+        let msg = if has_update {
+            format!("Доступна новая версия v{}!", tag_name)
+        } else {
+            format!("У вас установлена самая последняя версия (v{})", current_version)
+        };
+
+        json!({
+            "ok": true,
+            "has_update": has_update,
+            "current_version": current_version,
+            "latest_version": tag_name,
+            "release_name": release["name"].as_str().unwrap_or(""),
+            "release_notes": release["body"].as_str().unwrap_or(""),
+            "download_url": download_url,
+            "size": asset_size,
+            "msg": msg
+        })
+    }
+
+    fn install_app_update(&self, download_url: &str) -> Value {
+        if download_url.is_empty() {
+            return json!({ "ok": false, "msg": "Ссылка на скачивание не указана" });
+        }
+
+        let temp_dir = std::env::temp_dir();
+        let installer_path = temp_dir.join("video-studio-pro-update-setup.exe");
+
+        let mut cmd = Command::new("curl.exe");
+        #[cfg(windows)]
+        cmd.creation_flags(CREATE_NO_WINDOW);
+        cmd.args(["-L", "--max-time", "180", "-o", installer_path.to_str().unwrap_or("setup.exe"), download_url]);
+
+        let _status = match cmd.status() {
+            Ok(s) if s.success() => s,
+            Ok(s) => return json!({ "ok": false, "msg": format!("curl завершился с ошибкой: {}", s) }),
+            Err(e) => return json!({ "ok": false, "msg": format!("Ошибка загрузки: {}", e) }),
+        };
+
+        if !installer_path.exists() {
+            return json!({ "ok": false, "msg": "Файл установщика не найден после скачивания" });
+        }
+
+        #[cfg(windows)]
+        {
+            let _ = Command::new(&installer_path)
+                .args(["/CLOSEAPPLICATIONS", "/RESTARTAPPLICATIONS"])
+                .spawn();
+
+            std::thread::spawn(|| {
+                std::thread::sleep(std::time::Duration::from_millis(600));
+                std::process::exit(0);
+            });
+        }
+
+        json!({ "ok": true, "msg": "Установщик запущен. Приложение обновляется..." })
     }
 
     fn get_config(&self) -> Value {

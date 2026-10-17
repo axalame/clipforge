@@ -314,6 +314,41 @@
       </div>
     </div>
 
+    <!-- 6. App Updates (GitHub Releases) -->
+    <div class="tool-card">
+      <div class="tool-card-top">
+        <div class="tool-title-wrap">
+          <span class="tool-name">{{ t('app_update_title', 'Обновление приложения') }}</span>
+          <span class="status-pill" :class="appUpdateInfo?.has_update ? 'pill-warning' : 'pill-success'">
+            {{ appUpdateInfo?.has_update ? t('update_available', 'Доступно обновление') : t('up_to_date', 'Актуальная версия') }}
+          </span>
+        </div>
+        <div class="tool-top-actions">
+          <n-button size="small" secondary @click="checkAppUpdate" :loading="isCheckingAppUpdate">
+            {{ t('check_for_updates', 'Проверить обновления') }}
+          </n-button>
+          <n-button v-if="appUpdateInfo?.has_update" size="small" type="primary" @click="installAppUpdate" :loading="isInstallingAppUpdate">
+            {{ t('download_and_install', 'Скачать и обновить') }}
+          </n-button>
+        </div>
+      </div>
+
+      <div class="tool-desc">
+        {{ appUpdateInfo?.msg || t('app_update_desc', 'Автоматическая проверка и установка обновлений напрямую с официального репозитория GitHub.') }}
+      </div>
+
+      <div class="tool-meta-grid">
+        <div class="tool-meta-row">
+          <span class="meta-label">{{ t('current_version', 'Текущая версия') }}</span>
+          <span class="meta-value">v{{ appUpdateInfo?.current_version || '0.2.1' }}</span>
+        </div>
+        <div v-if="appUpdateInfo?.latest_version" class="tool-meta-row">
+          <span class="meta-label">{{ t('latest_version', 'Последняя версия') }}</span>
+          <span class="meta-value">v{{ appUpdateInfo.latest_version }}</span>
+        </div>
+      </div>
+    </div>
+
     <!-- Bottom action bar -->
     <div style="display:flex; gap:12px; margin-top:8px; padding-top:14px; border-top:1px solid rgba(255,255,255,0.06);">
       <n-button type="primary" size="medium" @click="saveConfig" style="font-weight:600;">
@@ -343,6 +378,9 @@ const isRefreshingConfig = ref(false);
 const isCheckingUpdate = ref(false);
 const isCheckingDenoUpdate = ref(false);
 const isCheckingFfmpegUpdate = ref(false);
+const isCheckingAppUpdate = ref(false);
+const isInstallingAppUpdate = ref(false);
+const appUpdateInfo = ref<any>(null);
 
 const ytdlpSource = ref("custom");
 const denoSource = ref("builtin");
@@ -472,6 +510,48 @@ const checkFfmpegUpdate = async () => {
     message.error(t("msg_ffmpeg_error") + e);
   } finally {
     isCheckingFfmpegUpdate.value = false;
+  }
+};
+
+const checkAppUpdate = async () => {
+  isCheckingAppUpdate.value = true;
+  try {
+    const res = await apiClient.checkAppUpdate();
+    if (res && res.ok) {
+      appUpdateInfo.value = res;
+      if (res.has_update) {
+        message.info(res.msg);
+      } else {
+        message.success(res.msg);
+      }
+    } else {
+      message.error(res?.msg || "Ошибка проверки обновлений");
+    }
+  } catch (e: any) {
+    message.error("Сбой сети: " + (e.message || e));
+  } finally {
+    isCheckingAppUpdate.value = false;
+  }
+};
+
+const installAppUpdate = async () => {
+  if (!appUpdateInfo.value?.download_url) {
+    message.warning("Ссылка на скачивание не найдена");
+    return;
+  }
+  isInstallingAppUpdate.value = true;
+  message.loading("Скачивание установщика... Пожалуйста, подождите.", { duration: 15000 });
+  try {
+    const res = await apiClient.installAppUpdate(appUpdateInfo.value.download_url);
+    if (res && res.ok) {
+      message.success(res.msg);
+    } else {
+      message.error(res?.msg || "Ошибка установки обновления");
+      isInstallingAppUpdate.value = false;
+    }
+  } catch (e: any) {
+    message.error("Ошибка при обновлении: " + (e.message || e));
+    isInstallingAppUpdate.value = false;
   }
 };
 
