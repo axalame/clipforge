@@ -36,6 +36,12 @@ fn default_cookie_source() -> String {
 }
 
 fn default_output_dir() -> String {
+    if let Ok(user_profile) = std::env::var("USERPROFILE") {
+        let downloads = PathBuf::from(user_profile).join("Downloads");
+        if downloads.exists() {
+            return downloads.to_string_lossy().to_string();
+        }
+    }
     "downloads".to_string()
 }
 
@@ -56,9 +62,23 @@ impl Default for AppConfig {
 }
 
 impl AppConfig {
+    pub fn get_config_path() -> PathBuf {
+        let local = Path::new(CONFIG_FILE);
+        if local.exists() {
+            return local.to_path_buf();
+        }
+        if let Ok(appdata) = std::env::var("APPDATA") {
+            let dir = PathBuf::from(appdata).join("VideoStudioPro");
+            let _ = fs::create_dir_all(&dir);
+            return dir.join(CONFIG_FILE);
+        }
+        PathBuf::from(CONFIG_FILE)
+    }
+
     pub fn load() -> Self {
-        if Path::new(CONFIG_FILE).exists() {
-            if let Ok(content) = fs::read_to_string(CONFIG_FILE) {
+        let path = Self::get_config_path();
+        if path.exists() {
+            if let Ok(content) = fs::read_to_string(&path) {
                 if let Ok(mut cfg) = serde_json::from_str::<AppConfig>(&content) {
                     if cfg.ffmpeg_dir.is_empty() || cfg.ytdlp_path.is_empty() || cfg.deno_path.is_empty() {
                         cfg.autodetect_tools();
@@ -73,8 +93,9 @@ impl AppConfig {
     }
 
     pub fn save(&self) {
+        let path = Self::get_config_path();
         if let Ok(json) = serde_json::to_string_pretty(self) {
-            let _ = fs::write(CONFIG_FILE, json);
+            let _ = fs::write(path, json);
         }
     }
 
