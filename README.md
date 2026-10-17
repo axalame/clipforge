@@ -39,7 +39,7 @@
 ## 🏛️ Архитектура проекта
 
 ```
-video-studio-pro/
+clipforge/
 ├── Cargo.toml                    # Конфигурация Rust и зависимости (Wry, Tao, RustEmbed, Tokio)
 ├── build.rs                      # Сборщик и встраивание ресурсов Windows
 ├── src/                          # Нативный Rust бэкенд

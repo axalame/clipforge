@@ -233,7 +233,7 @@ impl Api {
     }
 
     fn check_app_update(&self) -> Value {
-        let repo = "axalame/video-studio-pro";
+        let repo = "axalame/clipforge";
         let url = format!("https://api.github.com/repos/{}/releases/latest", repo);
 
         let mut cmd = Command::new("curl.exe");
