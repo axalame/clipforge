@@ -340,7 +340,7 @@
       <div class="tool-meta-grid">
         <div class="tool-meta-row">
           <span class="meta-label">{{ t('current_version', 'Текущая версия') }}</span>
-          <span class="meta-value">v{{ appUpdateInfo?.current_version || config.app_version || '0.3.0' }}</span>
+          <span class="meta-value">v{{ appUpdateInfo?.current_version || config.app_version || '0.3.1' }}</span>
         </div>
         <div v-if="appUpdateInfo?.latest_version" class="tool-meta-row">
           <span class="meta-label">{{ t('latest_version', 'Последняя версия') }}</span>
@@ -387,7 +387,7 @@ const denoSource = ref("builtin");
 const ffmpegSource = ref("builtin");
 
 const config = ref<any>({
-  app_version: "0.3.0",
+  app_version: "0.3.1",
   ffmpeg_dir: "ffmpeg",
   ytdlp_path: "yt-dlp",
   deno_path: "deno",
