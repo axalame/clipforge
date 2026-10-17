@@ -20,6 +20,31 @@ export const useConfigStore = defineStore("config", () => {
     ffmpeg: { ok: false, version: "", path: "", checking: false },
   });
 
+  const appUpdateInfo = ref<{
+    ok?: boolean;
+    has_update?: boolean;
+    current_version?: string;
+    latest_version?: string;
+    download_url?: string;
+    release_name?: string;
+    release_notes?: string;
+    size?: number;
+    msg?: string;
+  } | null>(null);
+
+  const checkAppUpdate = async () => {
+    try {
+      const res: any = await apiClient.checkAppUpdate();
+      if (res && res.ok) {
+        appUpdateInfo.value = res;
+      }
+      return res;
+    } catch (e) {
+      console.error("checkAppUpdate error:", e);
+      return null;
+    }
+  };
+
   const fetchConfig = async () => {
     try {
       const res: any = await apiClient.getConfig();
@@ -99,10 +124,12 @@ export const useConfigStore = defineStore("config", () => {
   return {
     config,
     toolStatuses,
+    appUpdateInfo,
     fetchConfig,
     loadConfig: fetchConfig,
     saveConfig,
     checkComponent,
     checkAllComponents,
+    checkAppUpdate,
   };
 });

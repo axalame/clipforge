@@ -89,5 +89,8 @@
   "notify_video_ready": "Video is ready",
   "notify_processing_finished": "Processing successfully finished",
   "notify_batch_ready": "Batch processing complete",
-  "notify_batch_finished": "All files in queue successfully processed"
+  "notify_batch_finished": "All files in queue successfully processed",
+  "update_available": "New version",
+  "update_action": "Update",
+  "update_click_hint": "ClipForge update available! Click to open settings"
 }

@@ -126,6 +126,21 @@
 
     <!-- Bottom Tool Status Health -->
     <div class="sidebar-footer">
+      <!-- App Update Available Pill above FFmpeg -->
+      <div
+        v-if="configStore.appUpdateInfo?.has_update"
+        class="sidebar-update-pill"
+        @click="appStore.activeNav = 'settings'"
+        :title="t('update_click_hint', 'Доступно обновление ClipForge! Нажмите, чтобы перейти в настройки')"
+      >
+        <span class="update-pulse-icon">⚡</span>
+        <div class="update-pill-texts">
+          <span class="update-pill-title">{{ t('update_available', 'Новая версия') }}</span>
+          <span class="update-pill-version">v{{ configStore.appUpdateInfo.latest_version }}</span>
+        </div>
+        <span class="update-pill-btn">{{ t('update_action', 'Обновить') }} →</span>
+      </div>
+
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <span>FFmpeg:</span>
         <span style="display:flex; align-items:center; gap:5px;">

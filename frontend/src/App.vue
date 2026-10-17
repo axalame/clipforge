@@ -263,5 +263,6 @@ onMounted(async () => {
   appStore.initTheme();
   taskStore.bindWindowCallbacks();
   await configStore.fetchConfig();
+  configStore.checkAppUpdate();
 });
 </script>

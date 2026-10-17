@@ -241,7 +241,7 @@ impl Api {
         let mut cmd = Command::new("curl.exe");
         #[cfg(windows)]
         cmd.creation_flags(CREATE_NO_WINDOW);
-        cmd.args(["-s", "--max-time", "10", "-H", "User-Agent: ClipForge-App", &url]);
+        cmd.args(["-s", "-L", "--max-time", "10", "-H", "User-Agent: ClipForge-App", "-H", "Cache-Control: no-cache", &url]);
 
         let output = match cmd.output() {
             Ok(o) if o.status.success() => o,

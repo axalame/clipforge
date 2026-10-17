@@ -340,7 +340,7 @@
       <div class="tool-meta-grid">
         <div class="tool-meta-row">
           <span class="meta-label">{{ t('current_version', 'Текущая версия') }}</span>
-          <span class="meta-value">v{{ appUpdateInfo?.current_version || config.app_version || '0.3.1' }}</span>
+          <span class="meta-value">v{{ appUpdateInfo?.current_version || config.app_version || '0.3.2' }}</span>
         </div>
         <div v-if="appUpdateInfo?.latest_version" class="tool-meta-row">
           <span class="meta-label">{{ t('latest_version', 'Последняя версия') }}</span>
@@ -380,14 +380,14 @@ const isCheckingDenoUpdate = ref(false);
 const isCheckingFfmpegUpdate = ref(false);
 const isCheckingAppUpdate = ref(false);
 const isInstallingAppUpdate = ref(false);
-const appUpdateInfo = ref<any>(null);
+const appUpdateInfo = computed(() => configStore.appUpdateInfo);
 
 const ytdlpSource = ref("custom");
 const denoSource = ref("builtin");
 const ffmpegSource = ref("builtin");
 
 const config = ref<any>({
-  app_version: "0.3.1",
+  app_version: "0.3.2",
   ffmpeg_dir: "ffmpeg",
   ytdlp_path: "yt-dlp",
   deno_path: "deno",
@@ -518,9 +518,8 @@ const checkAppUpdate = async (silentParam?: boolean | Event) => {
   const silent = typeof silentParam === "boolean" ? silentParam : false;
   isCheckingAppUpdate.value = true;
   try {
-    const res = await apiClient.checkAppUpdate();
+    const res = await configStore.checkAppUpdate();
     if (res && res.ok) {
-      appUpdateInfo.value = res;
       if (!silent) {
         if (res.has_update) {
           message.info(res.msg);
@@ -541,14 +540,14 @@ const checkAppUpdate = async (silentParam?: boolean | Event) => {
 };
 
 const installAppUpdate = async () => {
-  if (!appUpdateInfo.value?.download_url) {
+  if (!configStore.appUpdateInfo?.download_url) {
     message.warning("Ссылка на скачивание не найдена");
     return;
   }
   isInstallingAppUpdate.value = true;
   message.loading("Скачивание установщика... Пожалуйста, подождите.", { duration: 15000 });
   try {
-    const res = await apiClient.installAppUpdate(appUpdateInfo.value.download_url);
+    const res = await apiClient.installAppUpdate(configStore.appUpdateInfo.download_url);
     if (res && res.ok) {
       message.success(res.msg);
     } else {
