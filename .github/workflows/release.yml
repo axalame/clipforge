@@ -58,24 +58,11 @@ jobs:
         run: |
           "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
 
-      - name: Package Portable ZIP
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Path release_bundle
-          Copy-Item target/x86_64-pc-windows-msvc/release/video_studio.exe release_bundle/
-          Copy-Item video_processor_config.example.json release_bundle/
-          Copy-Item README.md release_bundle/
-          Copy-Item app_icon.ico release_bundle/
-          Compress-Archive -Path release_bundle/* -DestinationPath video-studio-pro-portable.zip
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
         with:
-          files: |
-            target/installer/video-studio-pro-setup.exe
-            video-studio-pro-portable.zip
-            target/x86_64-pc-windows-msvc/release/video_studio.exe
+          files: target/installer/video-studio-pro-setup.exe
           draft: false
           prerelease: false
           generate_release_notes: true
