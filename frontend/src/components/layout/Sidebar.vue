@@ -7,7 +7,7 @@
         </svg>
       </div>
       <div>
-        <div class="brand-title">Video Studio</div>
+        <div class="brand-title">ClipForge</div>
       </div>
     </div>
 

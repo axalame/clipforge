@@ -1,6 +1,6 @@
 [package]
-name = "video_studio"
-version = "0.2.1"
+name = "clipforge"
+version = "0.3.0"
 edition = "2021"
 
 [dependencies]

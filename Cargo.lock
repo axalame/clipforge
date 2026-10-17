@@ -382,6 +382,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6e4de3bc4ea267985becf712dc6d9eed8b04c953b3fcfb339ebc87acd9804901"
 
 [[package]]
+name = "clipforge"
+version = "0.3.0"
+dependencies = [
+ "percent-encoding",
+ "regex",
+ "rfd",
+ "rust-embed",
+ "serde",
+ "serde_json",
+ "tao",
+ "tiny_http",
+ "tokio",
+ "url",
+ "wry",
+]
+
+[[package]]
 name = "cocoa"
 version = "0.26.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3279,23 +3296,6 @@ name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
-
-[[package]]
-name = "video_studio"
-version = "0.2.1"
-dependencies = [
- "percent-encoding",
- "regex",
- "rfd",
- "rust-embed",
- "serde",
- "serde_json",
- "tao",
- "tiny_http",
- "tokio",
- "url",
- "wry",
-]
 
 [[package]]
 name = "walkdir"

@@ -67,7 +67,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 3. Build native desktop window
     let mut window_builder = WindowBuilder::new()
-        .with_title("Video Processing Studio")
+        .with_title("ClipForge")
         .with_inner_size(LogicalSize::new(1280.0, 850.0))
         .with_min_inner_size(LogicalSize::new(960.0, 640.0));
 
@@ -83,9 +83,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let proxy_for_ipc = proxy.clone();
 
     let data_dir = if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
-        std::path::PathBuf::from(local_app_data).join("VideoStudioPro").join("EBWebView")
+        std::path::PathBuf::from(local_app_data).join("ClipForge").join("EBWebView")
     } else {
-        std::env::temp_dir().join("VideoStudioPro").join("EBWebView")
+        std::env::temp_dir().join("ClipForge").join("EBWebView")
     };
     let _ = std::fs::create_dir_all(&data_dir);
     let mut web_context = wry::WebContext::new(Some(data_dir));

@@ -68,9 +68,18 @@ impl AppConfig {
             return local.to_path_buf();
         }
         if let Ok(appdata) = std::env::var("APPDATA") {
-            let dir = PathBuf::from(appdata).join("VideoStudioPro");
-            let _ = fs::create_dir_all(&dir);
-            return dir.join(CONFIG_FILE);
+            let clipforge_dir = PathBuf::from(&appdata).join("ClipForge");
+            let clipforge_config = clipforge_dir.join(CONFIG_FILE);
+            if clipforge_config.exists() {
+                return clipforge_config;
+            }
+            // Seamless migration from legacy VideoStudioPro config if it exists
+            let old_config = PathBuf::from(&appdata).join("VideoStudioPro").join(CONFIG_FILE);
+            let _ = fs::create_dir_all(&clipforge_dir);
+            if old_config.exists() {
+                let _ = fs::copy(&old_config, &clipforge_config);
+            }
+            return clipforge_config;
         }
         PathBuf::from(CONFIG_FILE)
     }

@@ -1,10 +1,10 @@
 ; ========================================================
-; Inno Setup Script for Video Studio Pro
+; Inno Setup Script for ClipForge
 ; ========================================================
-#define MyAppName "Video Studio Pro"
-#define MyAppVersion "0.2.0"
-#define MyAppPublisher "Video Studio Pro"
-#define MyAppExeName "video_studio.exe"
+#define MyAppName "ClipForge"
+#define MyAppVersion "0.3.0"
+#define MyAppPublisher "ClipForge"
+#define MyAppExeName "clipforge.exe"
 #define MyAppIcon "app_icon.ico"
 
 [Setup]
@@ -16,7 +16,7 @@ DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
 OutputDir=target\installer
-OutputBaseFilename=video-studio-pro-setup
+OutputBaseFilename=clipforge-setup
 SetupIconFile={#MyAppIcon}
 Compression=lzma2/ultra64
 SolidCompression=yes
@@ -32,7 +32,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
 
 [Files]
-Source: "target\release\video_studio.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "target\release\clipforge.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "app_icon.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: "video_processor_config.example.json"; DestDir: "{app}"; Flags: ignoreversion
 Source: "README.md"; DestDir: "{app}"; Flags: ignoreversion

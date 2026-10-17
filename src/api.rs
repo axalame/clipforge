@@ -239,7 +239,7 @@ impl Api {
         let mut cmd = Command::new("curl.exe");
         #[cfg(windows)]
         cmd.creation_flags(CREATE_NO_WINDOW);
-        cmd.args(["-s", "--max-time", "10", "-H", "User-Agent: VideoStudioPro-App", &url]);
+        cmd.args(["-s", "--max-time", "10", "-H", "User-Agent: ClipForge-App", &url]);
 
         let output = match cmd.output() {
             Ok(o) if o.status.success() => o,
@@ -301,7 +301,7 @@ impl Api {
         }
 
         let temp_dir = std::env::temp_dir();
-        let installer_path = temp_dir.join("video-studio-pro-update-setup.exe");
+        let installer_path = temp_dir.join("clipforge-update-setup.exe");
 
         let mut cmd = Command::new("curl.exe");
         #[cfg(windows)]
