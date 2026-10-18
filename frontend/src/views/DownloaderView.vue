@@ -213,6 +213,15 @@
             <n-checkbox v-model:checked="ytSponsorblock">{{ t('sponsorblock') }}</n-checkbox>
           </div>
 
+          <!-- Subtitle Language selector when subtitles are enabled -->
+          <div v-if="ytEmbedSubs || ytWriteSubs" style="margin-top:12px; padding:10px 14px; background:rgba(255,255,255,0.02); border:1px solid var(--border-color); border-radius:10px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
+            <div style="font-size:12px; color:var(--text-sub); display:flex; align-items:center; gap:8px;">
+              <svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2" fill="none"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 15h4M15 15h2M7 11h2M13 11h4"/></svg>
+              <span>{{ t('sub_langs_label') }}</span>
+            </div>
+            <n-select v-model:value="ytSubLang" :options="subLangOptions" size="small" style="width:230px;" />
+          </div>
+
           <!-- Cookies status -->
           <div style="margin-top:14px; padding-top:12px; border-top:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center;">
             <div style="font-size:12px; color:var(--text-muted); display:flex; align-items:center; gap:8px;">
@@ -457,7 +466,14 @@ const ytWriteSubs = ref<boolean>(false);
 const ytSplitChapters = ref<boolean>(false);
 const ytEmbedThumb = ref<boolean>(true);
 const ytSponsorblock = ref<boolean>(false);
+const ytSubLang = ref<string>("ru,en");
 const historyFilter = ref<string>("all");
+
+const subLangOptions = computed(() => [
+  { label: t("sub_lang_ru") || "Русский (ru)", value: "ru" },
+  { label: t("sub_lang_en") || "English (en)", value: "en" },
+  { label: t("sub_lang_ru_en") || "Русский + English (ru,en)", value: "ru,en" },
+]);
 
 const containerOptions = [
   { label: "MP4 (H.264 / AAC)", value: "mp4" },
@@ -650,6 +666,7 @@ const handleDownload = async () => {
     output_dir: configStore.config.output_dir || undefined,
     embed_subs: ytEmbedSubs.value,
     write_subs: ytWriteSubs.value,
+    sub_langs: ytSubLang.value,
     split_chapters: ytSplitChapters.value,
     embed_thumbnail: ytEmbedThumb.value,
     embed_metadata: ytEmbedMeta.value,

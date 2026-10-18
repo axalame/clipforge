@@ -356,15 +356,16 @@ pub fn build_ytdlp_command(params: &Value) -> Result<(Vec<String>, String), Stri
         ]);
     }
 
-    if params["embed_subs"].as_bool().unwrap_or(false) {
-        cmd.push("--embed-subs".to_string());
-    }
-    if params["write_subs"].as_bool().unwrap_or(false) {
+    let embed_subs = params["embed_subs"].as_bool().unwrap_or(false);
+    let write_subs = params["write_subs"].as_bool().unwrap_or(false);
+
+    if embed_subs || write_subs {
         let sub_langs = params["sub_langs"]
             .as_str()
             .map(str::trim)
             .filter(|s| !s.is_empty())
-            .unwrap_or("ru,en.*,all");
+            .unwrap_or("ru,en");
+
         cmd.extend(vec![
             "--write-subs".to_string(),
             "--write-auto-subs".to_string(),
@@ -375,6 +376,10 @@ pub fn build_ytdlp_command(params: &Value) -> Result<(Vec<String>, String), Stri
             "--sub-langs".to_string(),
             sub_langs.to_string(),
         ]);
+
+        if embed_subs {
+            cmd.push("--embed-subs".to_string());
+        }
     }
     if params["split_chapters"].as_bool().unwrap_or(false) {
         cmd.push("--split-chapters".to_string());
@@ -632,6 +637,6 @@ mod tests {
         });
         let (cmd_langs, _out) = build_ytdlp_command(&params_default_langs).unwrap();
         let default_langs_idx = cmd_langs.iter().position(|a| a == "--sub-langs").unwrap();
-        assert_eq!(cmd_langs[default_langs_idx + 1], "ru,en.*,all");
+        assert_eq!(cmd_langs[default_langs_idx + 1], "ru,en");
     }
 }
