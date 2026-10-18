@@ -360,7 +360,11 @@ pub fn build_ytdlp_command(params: &Value) -> Result<(Vec<String>, String), Stri
         cmd.push("--embed-subs".to_string());
     }
     if params["write_subs"].as_bool().unwrap_or(false) {
-        let sub_langs = params["sub_langs"].as_str().unwrap_or("ru,en.*,all");
+        let sub_langs = params["sub_langs"]
+            .as_str()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .unwrap_or("ru,en.*,all");
         cmd.extend(vec![
             "--write-subs".to_string(),
             "--write-auto-subs".to_string(),
@@ -409,6 +413,8 @@ pub fn build_ytdlp_command(params: &Value) -> Result<(Vec<String>, String), Stri
         .to_string();
 
     cmd.extend(vec![
+        "-P".to_string(),
+        out_dir.clone(),
         "-o".to_string(),
         out_template,
         "--no-playlist".to_string(),
