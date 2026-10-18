@@ -18,5 +18,30 @@ export default defineConfig({
         outDir: "dist",
         assetsDir: "assets",
         emptyOutDir: true,
+        rollupOptions: {
+            output: {
+                manualChunks: function (id) {
+                    if (id.includes("node_modules")) {
+                        if (id.includes("naive-ui") ||
+                            id.includes("vooks") ||
+                            id.includes("seemly") ||
+                            id.includes("treemate") ||
+                            id.includes("vdirs") ||
+                            id.includes("vueuc")) {
+                            return "naive-ui";
+                        }
+                        if (id.includes("vue-i18n")) {
+                            return "vue-i18n";
+                        }
+                        if (id.includes("pinia")) {
+                            return "pinia";
+                        }
+                        if (id.includes("vue") || id.includes("@vue")) {
+                            return "vue";
+                        }
+                    }
+                },
+            },
+        },
     },
 });

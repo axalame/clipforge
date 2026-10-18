@@ -34,7 +34,7 @@ pub fn analyze_url(params: &Value) -> Result<Value, String> {
         "node".to_string()
     };
 
-    cmd.args(&[
+    cmd.args([
         "--dump-single-json",
         "--skip-download",
         "--no-playlist",
@@ -53,7 +53,7 @@ pub fn analyze_url(params: &Value) -> Result<Value, String> {
             .unwrap_or_default()
     };
     if !ffmpeg_dir.is_empty() && Path::new(&ffmpeg_dir).exists() {
-        cmd.args(&["--ffmpeg-location", &ffmpeg_dir]);
+        cmd.args(["--ffmpeg-location", &ffmpeg_dir]);
     }
 
     let cookie_source = params["cookie_source"]
@@ -65,10 +65,10 @@ pub fn analyze_url(params: &Value) -> Result<Value, String> {
 
     if cookie_source == "file" {
         if !cookie_file.is_empty() && Path::new(cookie_file).exists() {
-            cmd.args(&["--cookies", cookie_file]);
+            cmd.args(["--cookies", cookie_file]);
         }
     } else if cookie_source.to_lowercase() != "none" && !cookie_source.is_empty() {
-        cmd.args(&["--cookies-from-browser", cookie_source]);
+        cmd.args(["--cookies-from-browser", cookie_source]);
     }
 
     cmd.arg("--");
@@ -77,7 +77,7 @@ pub fn analyze_url(params: &Value) -> Result<Value, String> {
     let output = cmd.output().map_err(|e| format!("Не удалось запустить yt-dlp: {}", e))?;
     if !output.status.success() {
         let err_msg = String::from_utf8_lossy(&output.stderr);
-        let first_err = err_msg.lines().filter(|l| l.contains("ERROR:")).last().unwrap_or(&err_msg);
+        let first_err = err_msg.lines().rfind(|l| l.contains("ERROR:")).unwrap_or(&err_msg);
         return Err(first_err.trim().to_string());
     }
 

@@ -66,7 +66,7 @@ impl ProcessRunner {
                     #[cfg(windows)]
                     {
                         let _ = Command::new("taskkill")
-                            .args(&["/F", "/T", "/PID", &pid.to_string()])
+                            .args(["/F", "/T", "/PID", &pid.to_string()])
                             .creation_flags(CREATE_NO_WINDOW)
                             .output();
                     }
@@ -148,7 +148,7 @@ impl ProcessRunner {
                     let mut last_log_time = std::time::Instant::now();
                     let mut last_prog_time = std::time::Instant::now();
 
-                    for line in reader.lines().flatten() {
+                    for line in reader.lines().map_while(Result::ok) {
                         log_batch.push(line.clone());
                         if log_batch.len() >= 25 || last_log_time.elapsed().as_millis() >= 100 {
                             cb_log.on_log(&log_batch.join("\n"));
@@ -215,7 +215,7 @@ impl ProcessRunner {
                 let mut last_log_time = std::time::Instant::now();
                 let mut last_prog_time = std::time::Instant::now();
 
-                for line in reader.lines().flatten() {
+                for line in reader.lines().map_while(Result::ok) {
                     log_batch.push(line.clone());
                     if log_batch.len() >= 25 || last_log_time.elapsed().as_millis() >= 100 {
                         callbacks.on_log(&log_batch.join("\n"));

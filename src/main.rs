@@ -67,16 +67,6 @@ fn load_tray_icon() -> Option<tray_icon::Icon> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_load_tray_icon_rgba() {
-        assert!(load_tray_icon().is_some());
-    }
-}
-
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 1. Start media streaming server on 127.0.0.1 (assigned free port)
     let media_server_url = start_media_server();
@@ -188,23 +178,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Event::UserEvent(UserEvent::EvalJs(script)) => {
                 let _ = webview.evaluate_script(&script);
             }
-            Event::UserEvent(UserEvent::TrayIconEvent(tray_event)) => {
-                match tray_event {
-                    tray_icon::TrayIconEvent::Click {
-                        button: tray_icon::MouseButton::Left,
-                        button_state: tray_icon::MouseButtonState::Up,
-                        ..
-                    }
-                    | tray_icon::TrayIconEvent::DoubleClick {
-                        button: tray_icon::MouseButton::Left,
-                        ..
-                    } => {
-                        window.set_visible(true);
-                        window.set_minimized(false);
-                        window.set_focus();
-                    }
-                    _ => {}
+            Event::UserEvent(UserEvent::TrayIconEvent(
+                tray_icon::TrayIconEvent::Click {
+                    button: tray_icon::MouseButton::Left,
+                    button_state: tray_icon::MouseButtonState::Up,
+                    ..
                 }
+                | tray_icon::TrayIconEvent::DoubleClick {
+                    button: tray_icon::MouseButton::Left,
+                    ..
+                },
+            )) => {
+                window.set_visible(true);
+                window.set_minimized(false);
+                window.set_focus();
             }
             Event::UserEvent(UserEvent::MenuEvent(menu_event)) => {
                 if menu_event.id == show_id {
@@ -226,4 +213,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             _ => (),
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_load_tray_icon_rgba() {
+        assert!(load_tray_icon().is_some());
+    }
 }

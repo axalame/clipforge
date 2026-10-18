@@ -206,7 +206,7 @@ impl Api {
         let mut cmd = Command::new("curl.exe");
         #[cfg(windows)]
         cmd.creation_flags(CREATE_NO_WINDOW);
-        cmd.args(&["-s", "--max-time", "5", "https://www.gyan.dev/ffmpeg/builds/release-version"]);
+        cmd.args(["-s", "--max-time", "5", "https://www.gyan.dev/ffmpeg/builds/release-version"]);
 
         match cmd.output() {
             Ok(out) if out.status.success() => {
@@ -460,7 +460,7 @@ impl Api {
             let mut cmd = Command::new("explorer");
             cmd.creation_flags(CREATE_NO_WINDOW);
             if p.is_file() {
-                cmd.args(&["/select,", filepath]);
+                cmd.args(["/select,", filepath]);
             } else if p.is_dir() {
                 cmd.arg(filepath);
             } else if let Some(parent) = p.parent() {
@@ -510,18 +510,18 @@ impl Api {
                         let mut matched_file: Option<std::path::PathBuf> = None;
                         for entry in entries.flatten() {
                             let path = entry.path();
-                            if path.is_file() {
-                                if path.file_stem().and_then(|s| s.to_str()).map(|s| s.to_lowercase()) == Some(target_stem.clone()) {
-                                    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
-                                    let is_media = matches!(
-                                        ext.as_str(),
-                                        "mp4" | "mkv" | "webm" | "mov" | "avi" | "flv" | "wmv" | "ts" | "m4v"
-                                        | "mp3" | "wav" | "ogg" | "m4a" | "flac" | "aac" | "opus"
-                                    );
-                                    if is_media {
-                                        matched_file = Some(path);
-                                        break;
-                                    }
+                            if path.is_file()
+                                && path.file_stem().and_then(|s| s.to_str()).map(|s| s.to_lowercase()) == Some(target_stem.clone())
+                            {
+                                let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+                                let is_media = matches!(
+                                    ext.as_str(),
+                                    "mp4" | "mkv" | "webm" | "mov" | "avi" | "flv" | "wmv" | "ts" | "m4v"
+                                    | "mp3" | "wav" | "ogg" | "m4a" | "flac" | "aac" | "opus"
+                                );
+                                if is_media {
+                                    matched_file = Some(path);
+                                    break;
                                 }
                             }
                         }

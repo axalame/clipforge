@@ -24,7 +24,7 @@ pub fn get_media_info(filepath: &str) -> Value {
     let mut cmd = Command::new(&ffprobe_exe);
     #[cfg(windows)]
     cmd.creation_flags(CREATE_NO_WINDOW);
-    cmd.args(&[
+    cmd.args([
         "-v", "quiet",
         "-print_format", "json",
         "-show_format",

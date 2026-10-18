@@ -162,7 +162,7 @@ fn handle_request(request: tiny_http::Request) -> Result<(), ()> {
         let mut cmd = Command::new(ffmpeg);
         #[cfg(windows)]
         cmd.creation_flags(CREATE_NO_WINDOW);
-        cmd.args(&[
+        cmd.args([
             "-y",
             "-ss", &t_val,
             "-i", &file_path,

@@ -29,7 +29,7 @@ fn main() {
         if let Ok(out_dir) = env::var("OUT_DIR") {
             let res_path = format!("{}/app.res", out_dir);
             let status = std::process::Command::new("windres")
-                .args(&["app.rc", "-O", "coff", "-o"])
+                .args(["app.rc", "-O", "coff", "-o"])
                 .arg(&res_path)
                 .status();
             if let Ok(s) = status {
