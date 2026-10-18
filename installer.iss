@@ -2,7 +2,7 @@
 ; Inno Setup Script for ClipForge
 ; ========================================================
 #define MyAppName "ClipForge"
-#define MyAppVersion "0.3.3"
+#define MyAppVersion "0.4.0"
 #define MyAppPublisher "ClipForge"
 #define MyAppExeName "clipforge.exe"
 #define MyAppIcon "app_icon.ico"
