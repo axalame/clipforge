@@ -681,6 +681,8 @@ impl FFmpegBuilder {
                         input_path.to_string(),
                         "-c:v".to_string(),
                         codec.to_string(),
+                        "-preset".to_string(),
+                        preset.to_string(),
                         "-b:v".to_string(),
                         format!("{}k", video_kbps as i64),
                         "-maxrate".to_string(),
@@ -785,7 +787,7 @@ impl FFmpegBuilder {
                         .map(|s| s.to_string())
                         .unwrap_or_else(|| get_output_path(input_path, "anim", &out_dir, Some("webp")));
 
-                    let filter_str = format!("fps={},scale={}:-1:flags=lanczos", fps, w);
+                    let filter_str = format!("fps={},scale={}:-2:flags=lanczos", fps, w);
 
                     cmd.extend(vec![
                         "-ss".to_string(),
@@ -796,6 +798,7 @@ impl FFmpegBuilder {
                         input_path.to_string(),
                         "-vf".to_string(),
                         filter_str,
+                        "-an".to_string(),
                         "-c:v".to_string(),
                         "libwebp".to_string(),
                         "-lossless".to_string(),
@@ -1163,6 +1166,8 @@ mod tests {
             .unwrap();
 
         assert!(target_out.contains("fit_25mb"));
+        assert!(cmd.contains(&"-preset".to_string()));
+        assert!(cmd.contains(&"medium".to_string()));
         assert!(cmd.contains(&"-b:v".to_string()));
         assert!(cmd.contains(&"3192k".to_string()));
         assert!(cmd.contains(&"-maxrate".to_string()));
@@ -1203,8 +1208,9 @@ mod tests {
         assert!(cmd.contains(&"75".to_string()));
         assert!(cmd.contains(&"-loop".to_string()));
         assert!(cmd.contains(&"0".to_string()));
+        assert!(cmd.contains(&"-an".to_string()));
         let vf_idx = cmd.iter().position(|s| s == "-vf").expect("should have -vf");
-        assert_eq!(cmd[vf_idx + 1], "fps=24,scale=640:-1:flags=lanczos");
+        assert_eq!(cmd[vf_idx + 1], "fps=24,scale=640:-2:flags=lanczos");
     }
 
     #[test]

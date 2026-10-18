@@ -492,6 +492,48 @@ impl Api {
             }
         }
 
+        // If direct file path does not exist or is a directory, search in output_dir (or parent) by stem/prefix
+        if !p.exists() || p.is_dir() {
+            let search_dir = if p.is_dir() {
+                p.clone()
+            } else if let Some(parent) = p.parent().filter(|par| !par.as_os_str().is_empty() && par.exists()) {
+                parent.to_path_buf()
+            } else {
+                std::path::PathBuf::from(&cfg.output_dir)
+            };
+
+            let raw_stem = std::path::Path::new(trimmed)
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or(trimmed);
+            let target_stem = raw_stem.trim().to_lowercase();
+
+            if search_dir.exists() && !target_stem.is_empty() {
+                if let Ok(entries) = std::fs::read_dir(&search_dir) {
+                    let mut matched_file: Option<std::path::PathBuf> = None;
+                    for entry in entries.flatten() {
+                        let path = entry.path();
+                        if path.is_file() {
+                            let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_lowercase();
+                            let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+                            let is_media = matches!(
+                                ext.as_str(),
+                                "mp4" | "mkv" | "webm" | "mov" | "avi" | "flv" | "wmv" | "ts" | "m4v"
+                                | "mp3" | "wav" | "ogg" | "m4a" | "flac" | "aac" | "opus"
+                            );
+                            if is_media && (name.starts_with(&target_stem) || name.contains(&target_stem) || target_stem.starts_with(&name)) {
+                                matched_file = Some(path);
+                                break;
+                            }
+                        }
+                    }
+                    if let Some(found) = matched_file {
+                        p = found;
+                    }
+                }
+            }
+        }
+
         if !p.exists() {
             return json!({ "ok": true, "message": "Файл уже отсутствует на диске" });
         }
@@ -513,8 +555,33 @@ impl Api {
             return json!({ "ok": false, "error": "Удаление файлов данного типа запрещено в целях безопасности" });
         }
 
+        let deleted_name = p.to_string_lossy().to_string();
+
+        // 1. Delete main file
         match std::fs::remove_file(&p) {
-            Ok(_) => json!({ "ok": true, "deleted": p.to_string_lossy() }),
+            Ok(_) => {
+                // 2. Also clean up any associated sidecars (.jpg, .webp, .vtt, .srt, .part, .ytdl)
+                if let Some(parent) = p.parent() {
+                    if let Some(stem) = p.file_stem().and_then(|s| s.to_str()) {
+                        if let Ok(entries) = std::fs::read_dir(parent) {
+                            for entry in entries.flatten() {
+                                let side = entry.path();
+                                if side != p && side.is_file() {
+                                    if let Some(side_name) = side.file_name().and_then(|n| n.to_str()) {
+                                        if side_name.starts_with(stem) {
+                                            let s_ext = side.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+                                            if matches!(s_ext.as_str(), "jpg" | "jpeg" | "webp" | "png" | "vtt" | "srt" | "part" | "ytdl" | "temp") {
+                                                let _ = std::fs::remove_file(&side);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                json!({ "ok": true, "deleted": deleted_name })
+            }
             Err(e) => json!({ "ok": false, "error": format!("Не удалось удалить файл: {}", e) }),
         }
     }
@@ -602,7 +669,19 @@ impl Api {
                 }).to_string();
                 let _ = proxy.send_event(UserEvent::EvalJs(format!("if (window.onBatchFileStart) window.onBatchFileStart({});", payload)));
 
-                let (cmd, target_out) = match builder.build_command(&op, file_path, &params_val, None) {
+                let info = get_media_info(file_path);
+                let dur = info["duration"].as_f64();
+
+                let mut file_params = params_val.clone();
+                if op == "compress" && file_params["target_size_mb"].as_f64().unwrap_or(0.0) > 0.0 {
+                    if let Some(d) = dur {
+                        if d > 0.0 {
+                            file_params["duration"] = json!(d);
+                        }
+                    }
+                }
+
+                let (cmd, target_out) = match builder.build_command(&op, file_path, &file_params, None) {
                     Ok(c) => c,
                     Err(e) => {
                         let err_msg = format!("[ОШИБКА] {}: {}", filename, e);
@@ -614,9 +693,6 @@ impl Api {
                         continue;
                     }
                 };
-
-                let info = get_media_info(file_path);
-                let dur = info["duration"].as_f64();
 
                 let cb = Arc::new(ApiCallbacks::new(proxy.clone()));
                 runner.run_command(&cmd, &target_out, dur, cb);
