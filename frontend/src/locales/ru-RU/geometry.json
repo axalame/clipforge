@@ -3,6 +3,7 @@
   "sub_geom_resize": "Разрешение (Resize)",
   "sub_geom_rotate": "Поворот и отражение",
   "sub_geom_fps": "Частота кадров (FPS)",
+  "sub_geom_shorts": "Shorts / Reels (9:16)",
   "crop_interactive_title": "Интерактивное кадрирование области мышью",
   "realtime_selection": "Выделение в реальном времени",
   "crop_hint": "Зажмите и протяните рамку по видео, двигайте или тяните за углы для масштабирования",
@@ -48,5 +49,10 @@
   "preset_1080p": "1080p FHD",
   "preset_720p": "720p HD",
   "preset_4k": "4K UHD",
-  "keep_aspect_label": "Сохранять пропорции (черные полосы)"
+  "keep_aspect_label": "Сохранять пропорции (черные полосы)",
+  "shorts_title": "Адаптер 9:16 Shorts/Reels (Smart-Blur)",
+  "shorts_desc": "Автоматически адаптирует горизонтальное видео (16:9) под вертикальный формат (9:16 Shorts/Reels/TikTok). Фон заполняется увеличенным размытым видео, а оригинал сохраняется по центру без обрезки.",
+  "shorts_blur_label": "Сила размытия фона (Blur):",
+  "btn_shorts_file": "Создать Shorts (9:16)",
+  "btn_shorts_queue": "Для всей очереди"
 }

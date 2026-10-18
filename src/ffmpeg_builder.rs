@@ -535,6 +535,52 @@ impl FFmpegBuilder {
                 Ok((cmd, target_out))
             }
 
+            "smart_blur_9_16" => {
+                let w = params["target_width"]
+                    .as_i64()
+                    .or_else(|| params["width"].as_i64())
+                    .unwrap_or(1080);
+                let h = params["target_height"]
+                    .as_i64()
+                    .or_else(|| params["height"].as_i64())
+                    .unwrap_or(1920);
+                let blur = params["blur"]
+                    .as_i64()
+                    .or_else(|| params["blur"].as_f64().map(|v| v.round() as i64))
+                    .unwrap_or(20)
+                    .clamp(5, 60);
+
+                let target_out = output_path
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|| get_output_path(input_path, "shorts_9_16", &out_dir, None));
+
+                let filter_str = format!(
+                    "[0:v]scale={}:{}:force_original_aspect_ratio=increase,crop={}:{},boxblur={}:5[bg];[0:v]scale={}:{}:force_original_aspect_ratio=decrease[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2[outv]",
+                    w, h, w, h, blur, w, h
+                );
+
+                cmd.extend(vec![
+                    "-i".to_string(),
+                    input_path.to_string(),
+                    "-filter_complex".to_string(),
+                    filter_str,
+                    "-map".to_string(),
+                    "[outv]".to_string(),
+                    "-map".to_string(),
+                    "0:a?".to_string(),
+                    "-c:v".to_string(),
+                    "libx264".to_string(),
+                    "-preset".to_string(),
+                    "medium".to_string(),
+                    "-crf".to_string(),
+                    "20".to_string(),
+                    "-c:a".to_string(),
+                    "copy".to_string(),
+                    target_out.clone(),
+                ]);
+                Ok((cmd, target_out))
+            }
+
             "normalize_audio" => {
                 let i = params["i"].as_f64().unwrap_or(-16.0).clamp(-70.0, -5.0);
                 let tp = params["tp"].as_f64().unwrap_or(-1.5).clamp(-9.0, 0.0);
@@ -991,6 +1037,43 @@ mod tests {
         }), None).unwrap();
         let vf180 = cmd180.iter().find(|s| s.contains("transpose=")).unwrap();
         assert_eq!(vf180, "transpose=1,transpose=1");
+    }
+
+    #[test]
+    fn test_smart_blur_9_16() {
+        let builder = FFmpegBuilder::new();
+        let (cmd, target_out) = builder
+            .build_command(
+                "smart_blur_9_16",
+                "test_input.mp4",
+                &json!({
+                    "blur": 25,
+                    "width": 1080,
+                    "height": 1920
+                }),
+                None,
+            )
+            .unwrap();
+
+        assert!(target_out.contains("shorts_9_16"));
+        let fc_idx = cmd.iter().position(|s| s == "-filter_complex").expect("should have -filter_complex");
+        let filter_str = &cmd[fc_idx + 1];
+        assert!(filter_str.contains("boxblur=25:5"));
+        assert!(filter_str.contains("scale=1080:1920:force_original_aspect_ratio=increase"));
+        assert!(filter_str.contains("crop=1080:1920"));
+        assert!(filter_str.contains("scale=1080:1920:force_original_aspect_ratio=decrease"));
+        assert!(filter_str.contains("overlay=(W-w)/2:(H-h)/2[outv]"));
+
+        assert!(cmd.contains(&"-c:v".to_string()));
+        assert!(cmd.contains(&"libx264".to_string()));
+        assert!(cmd.contains(&"-preset".to_string()));
+        assert!(cmd.contains(&"medium".to_string()));
+        assert!(cmd.contains(&"-crf".to_string()));
+        assert!(cmd.contains(&"20".to_string()));
+        assert!(cmd.contains(&"-c:a".to_string()));
+        assert!(cmd.contains(&"copy".to_string()));
+        assert!(cmd.contains(&"[outv]".to_string()));
+        assert!(cmd.contains(&"0:a?".to_string()));
     }
 
     #[test]

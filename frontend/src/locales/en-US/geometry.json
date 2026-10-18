@@ -3,6 +3,7 @@
   "sub_geom_resize": "Resize Scale",
   "sub_geom_rotate": "Rotate & Flip",
   "sub_geom_fps": "Frame Rate (FPS)",
+  "sub_geom_shorts": "Shorts / Reels (9:16)",
   "crop_interactive_title": "Interactive Mouse Crop Region",
   "realtime_selection": "Real-time selection",
   "crop_hint": "Click and drag on the video, move bounding box or pull corners",
@@ -48,5 +49,10 @@
   "preset_1080p": "1080p FHD",
   "preset_720p": "720p HD",
   "preset_4k": "4K UHD",
-  "keep_aspect_label": "Keep aspect ratio (black bars padding)"
+  "keep_aspect_label": "Keep aspect ratio (black bars padding)",
+  "shorts_title": "9:16 Shorts/Reels Adapter (Smart-Blur)",
+  "shorts_desc": "Automatically adapts landscape (16:9) video into vertical (9:16 Shorts/Reels/TikTok). Background is filled with scaled blurred video while original stays sharp in the center.",
+  "shorts_blur_label": "Background Blur Strength (Blur):",
+  "btn_shorts_file": "Convert to Shorts (9:16)",
+  "btn_shorts_queue": "Apply to All in Queue"
 }

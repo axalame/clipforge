@@ -5,6 +5,7 @@
       <button class="subtab-btn" :class="{ 'is-active': subGeom === 'resize' }" @click="subGeom = 'resize'">{{ t('sub_geom_resize') }}</button>
       <button class="subtab-btn" :class="{ 'is-active': subGeom === 'rotate' }" @click="subGeom = 'rotate'">{{ t('sub_geom_rotate') }}</button>
       <button class="subtab-btn" :class="{ 'is-active': subGeom === 'fps' }" @click="subGeom = 'fps'">{{ t('sub_geom_fps') }}</button>
+      <button class="subtab-btn" :class="{ 'is-active': subGeom === 'shorts' }" @click="subGeom = 'shorts'">{{ t('sub_geom_shorts') }}</button>
     </div>
 
     <!-- 1. Crop Form with Live Interactive Stage -->
@@ -203,6 +204,44 @@
         <n-button secondary @click="runBatch('change_fps')">{{ t('btn_fps_queue') }}</n-button>
       </n-flex>
     </div>
+
+    <!-- 5. Shorts / Reels Smart-Blur Form -->
+    <div v-if="subGeom === 'shorts'" class="studio-panel">
+      <div class="panel-header">
+        <span>{{ t('shorts_title') }}</span>
+      </div>
+      <p style="font-size:12px; color:var(--text-sub); margin-bottom:14px;">
+        {{ t('shorts_desc') }}
+      </p>
+
+      <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px;">
+        <n-button size="tiny" secondary @click="shortsForm.width = 1080; shortsForm.height = 1920">1080×1920 Full HD</n-button>
+        <n-button size="tiny" secondary @click="shortsForm.width = 720; shortsForm.height = 1280">720×1280 HD</n-button>
+      </div>
+
+      <div class="form-grid-2" style="margin-bottom:16px;">
+        <div class="form-field">
+          <label class="field-label">{{ t('shorts_blur_label') }} {{ shortsForm.blur }}</label>
+          <div style="display:flex; gap:10px; align-items:center;">
+            <n-slider v-model:value="shortsForm.blur" :min="10" :max="50" :step="1" style="flex:1;" />
+            <n-input-number v-model:value="shortsForm.blur" :min="5" :max="60" style="width:90px;" />
+          </div>
+        </div>
+        <div class="form-field">
+          <label class="field-label">{{ t('frame_width') }} × {{ t('frame_height') }}</label>
+          <div style="display:flex; gap:10px; align-items:center;">
+            <n-input-number v-model:value="shortsForm.width" :min="240" :step="2" style="flex:1;" />
+            <span>×</span>
+            <n-input-number v-model:value="shortsForm.height" :min="240" :step="2" style="flex:1;" />
+          </div>
+        </div>
+      </div>
+
+      <n-flex :size="10">
+        <n-button type="primary" @click="runOp('smart_blur_9_16')">{{ t('btn_shorts_file') }}</n-button>
+        <n-button secondary @click="runBatch('smart_blur_9_16')">{{ t('btn_shorts_queue') }}</n-button>
+      </n-flex>
+    </div>
   </div>
 </template>
 
@@ -226,7 +265,7 @@ const message = useMessage();
 const queueStore = useQueueStore();
 const configStore = useConfigStore();
 
-const subGeom = ref<"crop" | "resize" | "rotate" | "fps">("crop");
+const subGeom = ref<"crop" | "resize" | "rotate" | "fps" | "shorts">("crop");
 const stageRef = ref<HTMLElement | null>(null);
 const stageMode = ref<string>("");
 const dragStart = ref({ x: 0, y: 0, mouseX: 0, mouseY: 0, initX: 0, initY: 0, initW: 0, initH: 0 });
@@ -236,6 +275,7 @@ const cropForm = ref({ x: 0, y: 0, width: 640, height: 360, use_exact: true });
 const resizeForm = ref({ width: 1280, height: 720, keep_aspect: true });
 const rotateForm = ref({ angle: 90 });
 const fpsForm = ref({ fps: 30 });
+const shortsForm = ref({ blur: 20, width: 1080, height: 1920 });
 
 const getVideoDims = () => {
   const w = queueStore.selectedMediaInfo?.video?.width || 1280;
@@ -445,6 +485,12 @@ const runOp = async (op: string) => {
     params.angle = rotateForm.value.angle;
   } else if (op === "change_fps") {
     params.fps = fpsForm.value.fps;
+  } else if (op === "smart_blur_9_16") {
+    params.blur = shortsForm.value.blur;
+    params.width = shortsForm.value.width;
+    params.height = shortsForm.value.height;
+    params.target_width = shortsForm.value.width;
+    params.target_height = shortsForm.value.height;
   }
 
   await apiClient.startOperation(op, queueStore.activeFilePath, params);
@@ -471,6 +517,12 @@ const runBatch = async (op: string) => {
     params.angle = rotateForm.value.angle;
   } else if (op === "change_fps") {
     params.fps = fpsForm.value.fps;
+  } else if (op === "smart_blur_9_16") {
+    params.blur = shortsForm.value.blur;
+    params.width = shortsForm.value.width;
+    params.height = shortsForm.value.height;
+    params.target_width = shortsForm.value.width;
+    params.target_height = shortsForm.value.height;
   }
 
   const paths = queueStore.fileQueue.map((f) => f.path);
