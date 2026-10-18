@@ -485,50 +485,49 @@ impl Api {
 
         let cfg = AppConfig::load();
         let mut p = std::path::PathBuf::from(trimmed);
-        if !p.exists() {
-            let alt = std::path::Path::new(&cfg.output_dir).join(trimmed);
-            if alt.exists() {
-                p = alt;
-            }
+
+        if p.is_dir() {
+            return json!({ "ok": false, "error": "Указанный путь является папкой, удаление папок запрещено" });
         }
 
-        // If direct file path does not exist or is a directory, search in output_dir (or parent) by stem/prefix
-        if !p.exists() || p.is_dir() {
-            let search_dir = if p.is_dir() {
-                p.clone()
-            } else if let Some(parent) = p.parent().filter(|par| !par.as_os_str().is_empty() && par.exists()) {
-                parent.to_path_buf()
+        if !p.exists() {
+            let alt = std::path::Path::new(&cfg.output_dir).join(trimmed);
+            if alt.is_dir() {
+                return json!({ "ok": false, "error": "Указанный путь является папкой, удаление папок запрещено" });
+            }
+            if alt.exists() {
+                p = alt;
             } else {
-                std::path::PathBuf::from(&cfg.output_dir)
-            };
+                let raw_stem = std::path::Path::new(trimmed)
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or(trimmed);
+                let target_stem = raw_stem.trim().to_lowercase();
 
-            let raw_stem = std::path::Path::new(trimmed)
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or(trimmed);
-            let target_stem = raw_stem.trim().to_lowercase();
-
-            if search_dir.exists() && !target_stem.is_empty() {
-                if let Ok(entries) = std::fs::read_dir(&search_dir) {
-                    let mut matched_file: Option<std::path::PathBuf> = None;
-                    for entry in entries.flatten() {
-                        let path = entry.path();
-                        if path.is_file() {
-                            let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_lowercase();
-                            let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
-                            let is_media = matches!(
-                                ext.as_str(),
-                                "mp4" | "mkv" | "webm" | "mov" | "avi" | "flv" | "wmv" | "ts" | "m4v"
-                                | "mp3" | "wav" | "ogg" | "m4a" | "flac" | "aac" | "opus"
-                            );
-                            if is_media && (name.starts_with(&target_stem) || name.contains(&target_stem) || target_stem.starts_with(&name)) {
-                                matched_file = Some(path);
-                                break;
+                let out_dir = std::path::Path::new(&cfg.output_dir);
+                if out_dir.exists() && !target_stem.is_empty() {
+                    if let Ok(entries) = std::fs::read_dir(out_dir) {
+                        let mut matched_file: Option<std::path::PathBuf> = None;
+                        for entry in entries.flatten() {
+                            let path = entry.path();
+                            if path.is_file() {
+                                if path.file_stem().and_then(|s| s.to_str()).map(|s| s.to_lowercase()) == Some(target_stem.clone()) {
+                                    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+                                    let is_media = matches!(
+                                        ext.as_str(),
+                                        "mp4" | "mkv" | "webm" | "mov" | "avi" | "flv" | "wmv" | "ts" | "m4v"
+                                        | "mp3" | "wav" | "ogg" | "m4a" | "flac" | "aac" | "opus"
+                                    );
+                                    if is_media {
+                                        matched_file = Some(path);
+                                        break;
+                                    }
+                                }
                             }
                         }
-                    }
-                    if let Some(found) = matched_file {
-                        p = found;
+                        if let Some(found) = matched_file {
+                            p = found;
+                        }
                     }
                 }
             }
@@ -567,12 +566,10 @@ impl Api {
                             for entry in entries.flatten() {
                                 let side = entry.path();
                                 if side != p && side.is_file() {
-                                    if let Some(side_name) = side.file_name().and_then(|n| n.to_str()) {
-                                        if side_name.starts_with(stem) {
-                                            let s_ext = side.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
-                                            if matches!(s_ext.as_str(), "jpg" | "jpeg" | "webp" | "png" | "vtt" | "srt" | "part" | "ytdl" | "temp") {
-                                                let _ = std::fs::remove_file(&side);
-                                            }
+                                    if side.file_stem().and_then(|s| s.to_str()) == Some(stem) {
+                                        let s_ext = side.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+                                        if matches!(s_ext.as_str(), "jpg" | "jpeg" | "webp" | "png" | "vtt" | "srt" | "part" | "ytdl" | "temp") {
+                                            let _ = std::fs::remove_file(&side);
                                         }
                                     }
                                 }
