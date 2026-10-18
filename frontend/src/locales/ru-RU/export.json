@@ -40,5 +40,17 @@
   "quality_res_label": "Качество и разрешение:",
   "gif_quality_320p": "320p (Компактный)",
   "gif_quality_480p": "480p (Стандартный)",
-  "gif_quality_720p": "720p (Высокое качество)"
+  "gif_quality_720p": "720p (Высокое качество)",
+  "fit_size_title": "Сжатие до целевого размера (Fit-to-Size)",
+  "mode_crf": "CRF Качество",
+  "mode_size": "Точный размер (Fit-to-Size)",
+  "preset_10mb": "10 МБ (Email)",
+  "preset_25mb": "25 МБ (Discord)",
+  "preset_50mb": "50 МБ (Telegram)",
+  "preset_100mb": "100 МБ (Web)",
+  "custom_size": "Целевой размер",
+  "anim_format_label": "Формат анимации:",
+  "anim_fps_label": "Частота кадров (FPS):",
+  "webp_title": "Создание анимации WebP",
+  "btn_webp_file": "Создать WebP"
 }

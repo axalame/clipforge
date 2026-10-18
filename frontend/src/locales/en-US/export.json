@@ -40,5 +40,17 @@
   "quality_res_label": "Quality & Resolution:",
   "gif_quality_320p": "320p (Small)",
   "gif_quality_480p": "480p (Standard)",
-  "gif_quality_720p": "720p (High quality)"
+  "gif_quality_720p": "720p (High quality)",
+  "fit_size_title": "Target File Size Compression (Fit-to-Size)",
+  "mode_crf": "CRF Quality",
+  "mode_size": "Target Size (Fit-to-Size)",
+  "preset_10mb": "10 MB (Email)",
+  "preset_25mb": "25 MB (Discord)",
+  "preset_50mb": "50 MB (Telegram)",
+  "preset_100mb": "100 MB (Web)",
+  "custom_size": "Target file size",
+  "anim_format_label": "Animation format:",
+  "anim_fps_label": "Frame rate (FPS):",
+  "webp_title": "Animated WebP Creation",
+  "btn_webp_file": "Generate WebP"
 }

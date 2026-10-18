@@ -10,8 +10,30 @@
     <!-- Compress Form -->
     <div v-if="subExport === 'compress'" class="studio-panel">
       <div class="panel-header">
-        <span>{{ t('compress_title') }}</span>
+        <span>{{ compForm.mode === 'size' ? t('fit_size_title') : t('compress_title') }}</span>
       </div>
+
+      <div style="margin-bottom:16px;">
+        <div class="studio-subtabs" style="margin-bottom:0;">
+          <button
+            type="button"
+            class="subtab-btn"
+            :class="{ 'is-active': compForm.mode === 'crf' }"
+            @click="compForm.mode = 'crf'"
+          >
+            {{ t('mode_crf') }}
+          </button>
+          <button
+            type="button"
+            class="subtab-btn"
+            :class="{ 'is-active': compForm.mode === 'size' }"
+            @click="compForm.mode = 'size'"
+          >
+            {{ t('mode_size') }}
+          </button>
+        </div>
+      </div>
+
       <div class="form-grid-2" style="margin-bottom:16px;">
         <div class="form-field">
           <label class="field-label">{{ t('video_codec_label') }}</label>
@@ -21,9 +43,52 @@
           <label class="field-label">{{ t('speed_preset_label') }}</label>
           <n-select v-model:value="compForm.preset" :options="presetOptions" />
         </div>
-        <div class="form-field" style="grid-column: span 2;">
+
+        <div v-if="compForm.mode === 'crf'" class="form-field" style="grid-column: span 2;">
           <label class="field-label">{{ t('crf_level_label') }} {{ compForm.crf }} {{ t('crf_desc') }}</label>
           <n-slider v-model:value="compForm.crf" :min="16" :max="35" />
+        </div>
+
+        <div v-else class="form-field" style="grid-column: span 2;">
+          <label class="field-label">{{ t('custom_size') }} (MB):</label>
+          <div style="display:flex; gap:10px; align-items:center; margin-bottom:8px;">
+            <n-input-number v-model:value="compForm.target_size_mb" :min="1" :max="4000" style="width:140px;" />
+            <span style="font-size:13px; color:var(--text-sub);">MB</span>
+          </div>
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            <n-button
+              size="tiny"
+              :secondary="compForm.target_size_mb !== 10"
+              :type="compForm.target_size_mb === 10 ? 'primary' : 'default'"
+              @click="compForm.target_size_mb = 10"
+            >
+              {{ t('preset_10mb') }}
+            </n-button>
+            <n-button
+              size="tiny"
+              :secondary="compForm.target_size_mb !== 25"
+              :type="compForm.target_size_mb === 25 ? 'primary' : 'default'"
+              @click="compForm.target_size_mb = 25"
+            >
+              {{ t('preset_25mb') }}
+            </n-button>
+            <n-button
+              size="tiny"
+              :secondary="compForm.target_size_mb !== 50"
+              :type="compForm.target_size_mb === 50 ? 'primary' : 'default'"
+              @click="compForm.target_size_mb = 50"
+            >
+              {{ t('preset_50mb') }}
+            </n-button>
+            <n-button
+              size="tiny"
+              :secondary="compForm.target_size_mb !== 100"
+              :type="compForm.target_size_mb === 100 ? 'primary' : 'default'"
+              @click="compForm.target_size_mb = 100"
+            >
+              {{ t('preset_100mb') }}
+            </n-button>
+          </div>
         </div>
       </div>
       <n-flex :size="10">
@@ -52,8 +117,30 @@
     <!-- GIF Form -->
     <div v-if="subExport === 'gif'" class="studio-panel">
       <div class="panel-header">
-        <span>{{ t('gif_title') }}</span>
+        <span>{{ gifForm.format === 'webp' ? t('webp_title') : t('gif_title') }}</span>
       </div>
+
+      <div style="margin-bottom:16px;">
+        <div class="studio-subtabs" style="margin-bottom:0;">
+          <button
+            type="button"
+            class="subtab-btn"
+            :class="{ 'is-active': gifForm.format === 'gif' }"
+            @click="gifForm.format = 'gif'"
+          >
+            GIF
+          </button>
+          <button
+            type="button"
+            class="subtab-btn"
+            :class="{ 'is-active': gifForm.format === 'webp' }"
+            @click="gifForm.format = 'webp'"
+          >
+            WebP
+          </button>
+        </div>
+      </div>
+
       <div class="form-grid-2" style="margin-bottom:16px;">
         <div class="form-field">
           <label class="field-label">{{ t('gif_start') }} {{ gifForm.start }} {{ t('sec_unit') }}</label>
@@ -69,8 +156,18 @@
             <n-input-number v-model:value="gifForm.duration" :min="1" :max="60" style="width:90px;" />
           </div>
         </div>
+        <div class="form-field">
+          <label class="field-label">{{ t('anim_fps_label') }}</label>
+          <n-select v-model:value="gifForm.fps" :options="fpsOptions" />
+        </div>
+        <div class="form-field">
+          <label class="field-label">{{ t('quality_res_label') }}</label>
+          <n-select v-model:value="gifForm.quality" :options="gifQualityOptions" />
+        </div>
       </div>
-      <n-button type="primary" @click="runOp('create_gif')">{{ t('btn_gif_file') }}</n-button>
+      <n-button type="primary" @click="runOp('create_gif')">
+        {{ gifForm.format === 'webp' ? t('btn_webp_file') : t('btn_gif_file') }}
+      </n-button>
     </div>
 
     <!-- Metadata Form -->
@@ -121,9 +218,11 @@ const configStore = useConfigStore();
 const subExport = ref<"compress" | "convert" | "gif" | "meta">("compress");
 
 const compForm = ref({
+  mode: "crf" as "crf" | "size",
   codec: "libx264",
   preset: "medium",
   crf: 23,
+  target_size_mb: 25,
 });
 
 const convForm = ref({
@@ -132,9 +231,11 @@ const convForm = ref({
 });
 
 const gifForm = ref({
+  format: "gif" as "gif" | "webp",
   start: 0.0,
   duration: 5.0,
   quality: "480p",
+  fps: 15,
 });
 
 const metaForm = ref({
@@ -164,6 +265,18 @@ const presetOptions = computed(() => [
   { label: t("opt_preset_veryslow"), value: "veryslow" },
 ]);
 
+const fpsOptions = computed(() => [
+  { label: "15 FPS", value: 15 },
+  { label: "24 FPS", value: 24 },
+  { label: "30 FPS", value: 30 },
+]);
+
+const gifQualityOptions = computed(() => [
+  { label: t("gif_quality_320p"), value: "320p" },
+  { label: t("gif_quality_480p"), value: "480p" },
+  { label: t("gif_quality_720p"), value: "720p" },
+]);
+
 const buildParams = (op: string) => {
   const p: any = {};
   if (configStore.config.output_dir) p.output_dir = configStore.config.output_dir;
@@ -171,14 +284,21 @@ const buildParams = (op: string) => {
   if (op === "compress") {
     p.codec = compForm.value.codec;
     p.preset = compForm.value.preset;
-    p.crf = compForm.value.crf;
+    if (compForm.value.mode === "size") {
+      p.target_size_mb = compForm.value.target_size_mb;
+      p.duration = queueStore.selectedMediaInfo?.duration || 0;
+    } else {
+      p.crf = compForm.value.crf;
+    }
   } else if (op === "convert") {
     p.format = convForm.value.format;
     p.fast = convForm.value.fast;
   } else if (op === "create_gif") {
+    p.format = gifForm.value.format;
     p.start = gifForm.value.start;
     p.duration = gifForm.value.duration;
     p.quality = gifForm.value.quality;
+    p.fps = gifForm.value.fps;
   } else if (op === "apply_metadata") {
     p.title = metaForm.value.title;
     p.artist = metaForm.value.artist;

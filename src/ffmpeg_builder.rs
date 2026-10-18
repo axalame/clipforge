@@ -660,43 +660,78 @@ impl FFmpegBuilder {
 
             "compress" => {
                 let codec = params["codec"].as_str().unwrap_or("libx264");
-                let crf = params["crf"].as_i64().unwrap_or(23);
                 let preset = params["preset"].as_str().unwrap_or("medium");
-                let target_out = output_path
-                    .map(|s| s.to_string())
-                    .unwrap_or_else(|| get_output_path(input_path, &format!("compressed_{}", preset), &out_dir, None));
+                let target_size_mb = params["target_size_mb"].as_f64().unwrap_or(0.0);
 
-                cmd.extend(vec![
-                    "-i".to_string(),
-                    input_path.to_string(),
-                    "-c:v".to_string(),
-                    codec.to_string(),
-                ]);
+                if target_size_mb > 0.0 {
+                    let mut duration = params["duration"].as_f64().unwrap_or(0.0);
+                    if duration <= 1.0 {
+                        duration = 60.0;
+                    }
+                    let total_bits = target_size_mb * 8.0 * 1024.0 * 1024.0 * 0.95;
+                    let audio_kbps = 128.0;
+                    let video_kbps = (((total_bits / duration) - (audio_kbps * 1000.0)) / 1000.0).max(100.0);
 
-                if codec.contains("nvenc") {
+                    let target_out = output_path
+                        .map(|s| s.to_string())
+                        .unwrap_or_else(|| get_output_path(input_path, &format!("fit_{}mb", target_size_mb as i64), &out_dir, None));
+
                     cmd.extend(vec![
-                        "-cq".to_string(),
-                        crf.to_string(),
-                        "-preset".to_string(),
-                        preset.to_string(),
+                        "-i".to_string(),
+                        input_path.to_string(),
+                        "-c:v".to_string(),
+                        codec.to_string(),
+                        "-b:v".to_string(),
+                        format!("{}k", video_kbps as i64),
+                        "-maxrate".to_string(),
+                        format!("{}k", (video_kbps * 1.5) as i64),
+                        "-bufsize".to_string(),
+                        format!("{}k", (video_kbps * 2.0) as i64),
+                        "-c:a".to_string(),
+                        "aac".to_string(),
+                        "-b:a".to_string(),
+                        "128k".to_string(),
+                        target_out.clone(),
                     ]);
+                    Ok((cmd, target_out))
                 } else {
-                    cmd.extend(vec![
-                        "-crf".to_string(),
-                        crf.to_string(),
-                        "-preset".to_string(),
-                        preset.to_string(),
-                    ]);
-                }
+                    let crf = params["crf"].as_i64().unwrap_or(23);
+                    let target_out = output_path
+                        .map(|s| s.to_string())
+                        .unwrap_or_else(|| get_output_path(input_path, &format!("compressed_{}", preset), &out_dir, None));
 
-                cmd.extend(vec![
-                    "-c:a".to_string(),
-                    "aac".to_string(),
-                    "-b:a".to_string(),
-                    "128k".to_string(),
-                    target_out.clone(),
-                ]);
-                Ok((cmd, target_out))
+                    cmd.extend(vec![
+                        "-i".to_string(),
+                        input_path.to_string(),
+                        "-c:v".to_string(),
+                        codec.to_string(),
+                    ]);
+
+                    if codec.contains("nvenc") {
+                        cmd.extend(vec![
+                            "-cq".to_string(),
+                            crf.to_string(),
+                            "-preset".to_string(),
+                            preset.to_string(),
+                        ]);
+                    } else {
+                        cmd.extend(vec![
+                            "-crf".to_string(),
+                            crf.to_string(),
+                            "-preset".to_string(),
+                            preset.to_string(),
+                        ]);
+                    }
+
+                    cmd.extend(vec![
+                        "-c:a".to_string(),
+                        "aac".to_string(),
+                        "-b:a".to_string(),
+                        "128k".to_string(),
+                        target_out.clone(),
+                    ]);
+                    Ok((cmd, target_out))
+                }
             }
 
             "convert" => {
@@ -732,9 +767,11 @@ impl FFmpegBuilder {
                 let start = params["start"].as_f64().unwrap_or(0.0);
                 let duration = params["duration"].as_f64().unwrap_or(5.0);
                 let quality = params["quality"].as_str().unwrap_or("480p");
-                let target_out = output_path
-                    .map(|s| s.to_string())
-                    .unwrap_or_else(|| get_output_path(input_path, "anim", &out_dir, Some("gif")));
+                let fps = params["fps"]
+                    .as_i64()
+                    .or_else(|| params["fps"].as_str().and_then(|s| s.parse().ok()))
+                    .unwrap_or(15);
+                let format = params["format"].as_str().unwrap_or("gif").to_lowercase();
 
                 let w = match quality {
                     "320p" => 480,
@@ -743,25 +780,58 @@ impl FFmpegBuilder {
                     _ => 640,
                 };
 
-                let filter_str = format!(
-                    "fps=15,scale={}:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse",
-                    w
-                );
+                if format == "webp" {
+                    let target_out = output_path
+                        .map(|s| s.to_string())
+                        .unwrap_or_else(|| get_output_path(input_path, "anim", &out_dir, Some("webp")));
 
-                cmd.extend(vec![
-                    "-ss".to_string(),
-                    start.to_string(),
-                    "-t".to_string(),
-                    duration.to_string(),
-                    "-i".to_string(),
-                    input_path.to_string(),
-                    "-vf".to_string(),
-                    filter_str,
-                    "-loop".to_string(),
-                    "0".to_string(),
-                    target_out.clone(),
-                ]);
-                Ok((cmd, target_out))
+                    let filter_str = format!("fps={},scale={}:-1:flags=lanczos", fps, w);
+
+                    cmd.extend(vec![
+                        "-ss".to_string(),
+                        start.to_string(),
+                        "-t".to_string(),
+                        duration.to_string(),
+                        "-i".to_string(),
+                        input_path.to_string(),
+                        "-vf".to_string(),
+                        filter_str,
+                        "-c:v".to_string(),
+                        "libwebp".to_string(),
+                        "-lossless".to_string(),
+                        "0".to_string(),
+                        "-q:v".to_string(),
+                        "75".to_string(),
+                        "-loop".to_string(),
+                        "0".to_string(),
+                        target_out.clone(),
+                    ]);
+                    Ok((cmd, target_out))
+                } else {
+                    let target_out = output_path
+                        .map(|s| s.to_string())
+                        .unwrap_or_else(|| get_output_path(input_path, "anim", &out_dir, Some("gif")));
+
+                    let filter_str = format!(
+                        "fps={},scale={}:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse",
+                        fps, w
+                    );
+
+                    cmd.extend(vec![
+                        "-ss".to_string(),
+                        start.to_string(),
+                        "-t".to_string(),
+                        duration.to_string(),
+                        "-i".to_string(),
+                        input_path.to_string(),
+                        "-vf".to_string(),
+                        filter_str,
+                        "-loop".to_string(),
+                        "0".to_string(),
+                        target_out.clone(),
+                    ]);
+                    Ok((cmd, target_out))
+                }
             }
 
             "apply_metadata" => {
@@ -1074,6 +1144,67 @@ mod tests {
         assert!(cmd.contains(&"copy".to_string()));
         assert!(cmd.contains(&"[outv]".to_string()));
         assert!(cmd.contains(&"0:a?".to_string()));
+    }
+
+    #[test]
+    fn test_compress_fit_to_size() {
+        let builder = FFmpegBuilder::new();
+        let (cmd, target_out) = builder
+            .build_command(
+                "compress",
+                "sample.mp4",
+                &json!({
+                    "target_size_mb": 25.0,
+                    "duration": 60.0,
+                    "codec": "libx264"
+                }),
+                None,
+            )
+            .unwrap();
+
+        assert!(target_out.contains("fit_25mb"));
+        assert!(cmd.contains(&"-b:v".to_string()));
+        assert!(cmd.contains(&"3192k".to_string()));
+        assert!(cmd.contains(&"-maxrate".to_string()));
+        assert!(cmd.contains(&"4788k".to_string()));
+        assert!(cmd.contains(&"-bufsize".to_string()));
+        assert!(cmd.contains(&"6384k".to_string()));
+        assert!(cmd.contains(&"-c:a".to_string()));
+        assert!(cmd.contains(&"aac".to_string()));
+        assert!(cmd.contains(&"-b:a".to_string()));
+        assert!(cmd.contains(&"128k".to_string()));
+    }
+
+    #[test]
+    fn test_create_animated_webp() {
+        let builder = FFmpegBuilder::new();
+        let (cmd, target_out) = builder
+            .build_command(
+                "create_gif",
+                "sample.mp4",
+                &json!({
+                    "format": "webp",
+                    "start": 2.0,
+                    "duration": 4.0,
+                    "quality": "480p",
+                    "fps": 24
+                }),
+                None,
+            )
+            .unwrap();
+
+        assert!(target_out.ends_with(".webp"));
+        assert!(target_out.contains("anim"));
+        assert!(cmd.contains(&"-c:v".to_string()));
+        assert!(cmd.contains(&"libwebp".to_string()));
+        assert!(cmd.contains(&"-lossless".to_string()));
+        assert!(cmd.contains(&"0".to_string()));
+        assert!(cmd.contains(&"-q:v".to_string()));
+        assert!(cmd.contains(&"75".to_string()));
+        assert!(cmd.contains(&"-loop".to_string()));
+        assert!(cmd.contains(&"0".to_string()));
+        let vf_idx = cmd.iter().position(|s| s == "-vf").expect("should have -vf");
+        assert_eq!(cmd[vf_idx + 1], "fps=24,scale=640:-1:flags=lanczos");
     }
 
     #[test]
