@@ -14,6 +14,7 @@ static RE_FFMPEG_FRAME: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"frame=\s
 static RE_YTDLP: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"\[download\]\s+([\d\.]+)%\s+of\s+~?([\d\.]+\w+)\s+at\s+([\d\.]+\w+/s)\s+ETA\s+(\S+)").unwrap()
 });
+static RE_ANSI: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\x1B\[[0-?]*[ -/]*[@-~]").unwrap());
 
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
@@ -223,22 +224,40 @@ impl ProcessRunner {
                     }
 
                     if is_ytdlp {
-                        let trimmed = line.trim();
-                        if trimmed.starts_with("[download] Destination:") {
-                            let dest = trimmed.trim_start_matches("[download] Destination:").trim();
+                        let clean = RE_ANSI.replace_all(&line, "");
+                        let trimmed = clean.trim();
+                        if trimmed.contains("__FINAL_OUT__:") {
+                            if let Some(dest) = trimmed.split("__FINAL_OUT__:").nth(1) {
+                                let clean_dest = dest.trim().trim_matches('"').trim_matches('\'');
+                                if !clean_dest.is_empty() {
+                                    detected_out_file = clean_dest.to_string();
+                                }
+                            }
+                        } else if trimmed.starts_with("[download] Destination:") {
+                            let dest = trimmed.trim_start_matches("[download] Destination:").trim().trim_matches('"').trim_matches('\'');
                             detected_out_file = dest.to_string();
                         } else if trimmed.starts_with("[Merger] Merging formats into") {
-                            let dest = trimmed.trim_start_matches("[Merger] Merging formats into").trim().trim_matches('"');
+                            let dest = trimmed.trim_start_matches("[Merger] Merging formats into").trim().trim_matches('"').trim_matches('\'');
                             detected_out_file = dest.to_string();
+                        } else if trimmed.starts_with("[ffmpeg] Merging formats into") {
+                            let dest = trimmed.trim_start_matches("[ffmpeg] Merging formats into").trim().trim_matches('"').trim_matches('\'');
+                            detected_out_file = dest.to_string();
+                        } else if trimmed.starts_with("[VideoRemuxer] Remuxing video from") {
+                            if let Some(dest) = trimmed.split("to ").nth(1) {
+                                let clean_dest = dest.trim().trim_matches('"').trim_matches('\'');
+                                if !clean_dest.is_empty() {
+                                    detected_out_file = clean_dest.to_string();
+                                }
+                            }
                         } else if trimmed.starts_with("[ExtractAudio] Destination:") {
-                            let dest = trimmed.trim_start_matches("[ExtractAudio] Destination:").trim();
+                            let dest = trimmed.trim_start_matches("[ExtractAudio] Destination:").trim().trim_matches('"').trim_matches('\'');
                             detected_out_file = dest.to_string();
                         } else if trimmed.starts_with("[download]") && trimmed.ends_with("has already been downloaded") {
-                            let dest = trimmed.trim_start_matches("[download]").trim_end_matches("has already been downloaded").trim();
+                            let dest = trimmed.trim_start_matches("[download]").trim_end_matches("has already been downloaded").trim().trim_matches('"').trim_matches('\'');
                             detected_out_file = dest.to_string();
                         }
 
-                        if let Some(caps) = RE_YTDLP.captures(&line) {
+                        if let Some(caps) = RE_YTDLP.captures(&clean) {
                             let pct: f64 = caps[1].parse().unwrap_or(0.0);
                             let size = &caps[2];
                             let speed = &caps[3];
@@ -283,6 +302,31 @@ impl ProcessRunner {
             match status {
                 Some(st) if st.success() => {
                     callbacks.on_progress(json!({ "percent": 100.0 }));
+
+                    if is_ytdlp && (detected_out_file.is_empty() || Path::new(&detected_out_file).is_dir()) && Path::new(&target_out).is_dir() {
+                        if let Ok(entries) = std::fs::read_dir(&target_out) {
+                            let mut newest_file: Option<(std::path::PathBuf, std::time::SystemTime)> = None;
+                            for entry in entries.flatten() {
+                                if let Ok(meta) = entry.metadata() {
+                                    if meta.is_file() {
+                                        let p = entry.path();
+                                        let ext = p.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+                                        if matches!(ext.as_str(), "mp4" | "mkv" | "webm" | "mov" | "mp3" | "m4a" | "flac" | "wav" | "aac" | "opus") {
+                                            if let Ok(mtime) = meta.modified() {
+                                                if newest_file.as_ref().map(|(_, t)| mtime > *t).unwrap_or(true) {
+                                                    newest_file = Some((p, mtime));
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            if let Some((p, _)) = newest_file {
+                                detected_out_file = p.to_string_lossy().to_string();
+                            }
+                        }
+                    }
+
                     let final_out = if !detected_out_file.is_empty() {
                         let p = Path::new(&detected_out_file);
                         if p.is_absolute() {

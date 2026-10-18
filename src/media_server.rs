@@ -3,7 +3,7 @@ use percent_encoding::percent_decode_str;
 use rust_embed::RustEmbed;
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicU16, Ordering};
 use std::sync::Arc;
@@ -87,6 +87,26 @@ const ALLOWED_MEDIA: &[&str] = &[
     "mp3", "wav", "ogg", "m4a", "flac", "aac", "opus"
 ];
 
+fn get_frontend_dist_dir() -> Option<PathBuf> {
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(parent) = exe_path.parent() {
+            let p = parent.join("frontend").join("dist");
+            if p.is_dir() {
+                if let Ok(can) = p.canonicalize() {
+                    return Some(can);
+                }
+            }
+        }
+    }
+    let p = Path::new("frontend/dist");
+    if p.is_dir() {
+        if let Ok(can) = p.canonicalize() {
+            return Some(can);
+        }
+    }
+    None
+}
+
 fn handle_request(request: tiny_http::Request) -> Result<(), ()> {
     let url_raw = request.url();
     let (path, query) = match url_raw.split_once('?') {
@@ -112,6 +132,7 @@ fn handle_request(request: tiny_http::Request) -> Result<(), ()> {
 
     if request.method().as_str() == "OPTIONS" {
         let resp = Response::empty(200)
+            .with_header(header("Access-Control-Allow-Origin", "*"))
             .with_header(header("Access-Control-Allow-Methods", "GET, OPTIONS"))
             .with_header(header("Access-Control-Allow-Headers", "*"));
         let _ = request.respond(resp);
@@ -157,6 +178,7 @@ fn handle_request(request: tiny_http::Request) -> Result<(), ()> {
         if let Ok(out) = cmd.output() {
             if out.status.success() && !out.stdout.is_empty() {
                 let resp = Response::from_data(out.stdout)
+                    .with_header(header("Access-Control-Allow-Origin", "*"))
                     .with_header(header("Content-Type", "image/jpeg"))
                     .with_header(header("Cache-Control", "public, max-age=300"));
                 let _ = request.respond(resp);
@@ -192,6 +214,7 @@ fn handle_request(request: tiny_http::Request) -> Result<(), ()> {
 
         if let Ok(data) = std::fs::read(&file_path) {
             let resp = Response::from_data(data)
+                .with_header(header("Access-Control-Allow-Origin", "*"))
                 .with_header(header("Content-Type", mime))
                 .with_header(header("Cache-Control", "private, max-age=3600"));
             let _ = request.respond(resp);
@@ -247,6 +270,7 @@ fn handle_request(request: tiny_http::Request) -> Result<(), ()> {
                 let start: u64 = parts.next().and_then(|s| s.parse().ok()).unwrap_or(0);
                 if start >= file_size {
                     let resp = Response::empty(StatusCode(416))
+                        .with_header(header("Access-Control-Allow-Origin", "*"))
                         .with_header(header("Content-Range", &format!("bytes */{}", file_size)));
                     let _ = request.respond(resp);
                     return Ok(());
@@ -271,6 +295,7 @@ fn handle_request(request: tiny_http::Request) -> Result<(), ()> {
                                 let resp = Response::new(
                                     StatusCode(206),
                                     vec![
+                                        header("Access-Control-Allow-Origin", "*"),
                                         header("Content-Type", mime),
                                         header("Accept-Ranges", "bytes"),
                                         header("Content-Range", &content_range),
@@ -294,6 +319,7 @@ fn handle_request(request: tiny_http::Request) -> Result<(), ()> {
             let resp = Response::new(
                 StatusCode(200),
                 vec![
+                    header("Access-Control-Allow-Origin", "*"),
                     header("Content-Type", mime),
                     header("Accept-Ranges", "bytes"),
                     header("Content-Length", &file_size.to_string()),
@@ -315,15 +341,26 @@ fn handle_request(request: tiny_http::Request) -> Result<(), ()> {
     let rel_path = if raw_rel.is_empty() { "index.html" } else { raw_rel };
 
     // 1. Check local disk for development, protected against Path Traversal
-    let base_dir = Path::new("frontend/dist");
-    if let Ok(base_canonical) = base_dir.canonicalize() {
-        let candidate = base_dir.join(rel_path);
+    if let Some(dist_dir) = get_frontend_dist_dir() {
+        let candidate = dist_dir.join(rel_path);
         if let Ok(canonical) = candidate.canonicalize() {
-            if canonical.starts_with(&base_canonical) && canonical.is_file() {
+            if canonical.starts_with(&dist_dir) && canonical.is_file() {
                 if let Ok(data) = std::fs::read(&canonical) {
                     let mime = get_mime_type(rel_path);
                     let resp = Response::from_data(data)
                         .with_header(header("Content-Type", mime));
+                    let _ = request.respond(resp);
+                    return Ok(());
+                }
+            }
+        }
+        // If file not found on disk, but path is a SPA client-side route, fallback to disk index.html
+        if !rel_path.contains('.') {
+            let disk_index = dist_dir.join("index.html");
+            if disk_index.is_file() {
+                if let Ok(data) = std::fs::read(&disk_index) {
+                    let resp = Response::from_data(data)
+                        .with_header(header("Content-Type", "text/html; charset=utf-8"));
                     let _ = request.respond(resp);
                     return Ok(());
                 }

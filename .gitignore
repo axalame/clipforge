@@ -29,6 +29,8 @@ pnpm-debug.log*
 
 # 4. Local Binaries & Runtime Cache
 video_studio.exe
+clipforge.exe
+*.exe
 video_studio.exe.WebView2/
 *.WebView2/
 *.pdb

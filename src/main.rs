@@ -141,9 +141,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _ = std::fs::create_dir_all(&data_dir);
     let mut web_context = wry::WebContext::new(Some(data_dir));
 
-    // 5. Build native WebView2 instance
+    // 5. Select target URL: probe for Vite dev server at http://127.0.0.1:5173 for live HMR
+    let mut target_url = media_server_url.clone();
+    if let Ok(addr) = "127.0.0.1:5173".parse() {
+        if let Ok(stream) = std::net::TcpStream::connect_timeout(&addr, std::time::Duration::from_millis(150)) {
+            drop(stream);
+            println!("[DevMode] Vite dev server detected at http://127.0.0.1:5173! Connecting for live HMR...");
+            target_url = "http://localhost:5173".to_string();
+        }
+    }
+
+    // Build native WebView2 instance
     let webview = WebViewBuilder::with_web_context(&mut web_context)
-        .with_url(&media_server_url)
+        .with_url(&target_url)
         .with_devtools(true)
         .with_initialization_script(POLYFILL_JS)
         .with_ipc_handler(move |req| {
