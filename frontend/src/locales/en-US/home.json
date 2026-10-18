@@ -44,6 +44,8 @@
   "direct_stream_tip": "Direct stream without transcoding (0% CPU, max speed)",
   "embed_meta": "Embed metadata",
   "embed_subs": "Embed subtitles",
+  "write_subs": "Save subtitles (.srt)",
+  "split_chapters": "Split by chapters",
   "embed_thumb": "Embed thumbnail",
   "sponsorblock": "Skip sponsor segments (SponsorBlock)",
   "auth_cookies": "Authentication (Cookies):",

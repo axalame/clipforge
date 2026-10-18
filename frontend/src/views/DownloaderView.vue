@@ -53,13 +53,13 @@
         </div>
 
         <!-- Batch Mode Input -->
-        <div v-else class="yt-search-box">
+        <div v-else class="yt-batch-box">
           <n-input
             v-model:value="ytUrl"
             type="textarea"
             :placeholder="t('placeholder_batch')"
-            :rows="4"
-            style="border-radius:12px; background:#111722;"
+            :autosize="{ minRows: 2, maxRows: 5 }"
+            class="yt-batch-input"
           />
         </div>
 
@@ -207,6 +207,8 @@
           <div class="yt-checkbox-grid">
             <n-checkbox v-model:checked="ytEmbedMeta">{{ t('embed_meta') }}</n-checkbox>
             <n-checkbox v-model:checked="ytEmbedSubs">{{ t('embed_subs') }}</n-checkbox>
+            <n-checkbox v-model:checked="ytWriteSubs">{{ t('write_subs') }}</n-checkbox>
+            <n-checkbox v-model:checked="ytSplitChapters">{{ t('split_chapters') }}</n-checkbox>
             <n-checkbox v-model:checked="ytEmbedThumb">{{ t('embed_thumb') }}</n-checkbox>
             <n-checkbox v-model:checked="ytSponsorblock">{{ t('sponsorblock') }}</n-checkbox>
           </div>
@@ -451,6 +453,8 @@ const ytTrimStart = ref<string>("00:00:00");
 const ytTrimEnd = ref<string>("");
 const ytEmbedMeta = ref<boolean>(true);
 const ytEmbedSubs = ref<boolean>(false);
+const ytWriteSubs = ref<boolean>(false);
+const ytSplitChapters = ref<boolean>(false);
 const ytEmbedThumb = ref<boolean>(true);
 const ytSponsorblock = ref<boolean>(false);
 const historyFilter = ref<string>("all");
@@ -566,7 +570,13 @@ const resetAnalysis = () => {
 };
 
 const handleAnalyze = async () => {
-  const targetUrl = ytUrl.value.trim();
+  const raw = ytUrl.value.trim();
+  if (!raw) {
+    message.warning(t("msg_enter_url"));
+    return;
+  }
+  const urls = raw.split(/\r?\n/).map((u) => u.trim()).filter((u) => u.length > 0);
+  const targetUrl = urls[0];
   if (!targetUrl) {
     message.warning(t("msg_enter_url"));
     return;
@@ -639,6 +649,8 @@ const handleDownload = async () => {
     cookie_file: configStore.config.cookies_file,
     output_dir: configStore.config.output_dir || undefined,
     embed_subs: ytEmbedSubs.value,
+    write_subs: ytWriteSubs.value,
+    split_chapters: ytSplitChapters.value,
     embed_thumbnail: ytEmbedThumb.value,
     embed_metadata: ytEmbedMeta.value,
     sponsorblock: ytSponsorblock.value,
@@ -705,10 +717,20 @@ const openHistoryFolder = (item: DownloadHistoryItem) => {
 };
 
 const removeHistoryItem = async (item: DownloadHistoryItem) => {
-  const targetPath = item.outputPath || (configStore.config.output_dir ? `${configStore.config.output_dir}/${item.title}.${item.container || 'mp4'}` : "");
+  let targetPath = item.outputPath;
+  const isDir = !targetPath || targetPath === configStore.config.output_dir || targetPath.endsWith("/") || targetPath.endsWith("\\");
+  if (isDir) {
+    targetPath = configStore.config.output_dir
+      ? `${configStore.config.output_dir}/${item.title}.${item.container || 'mp4'}`
+      : `${item.title}.${item.container || 'mp4'}`;
+  }
+
   if (targetPath) {
     try {
-      await apiClient.deleteFile(targetPath);
+      const res = await apiClient.deleteFile(targetPath);
+      if ((!res || !res.ok) && item.title) {
+        await apiClient.deleteFile(item.title);
+      }
     } catch (e) {
       console.warn("Failed to delete file from disk:", e);
     }

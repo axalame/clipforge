@@ -44,6 +44,8 @@
   "direct_stream_tip": "Прямой поток без перекодирования (0% CPU, макс. скорость)",
   "embed_meta": "Встроить метаданные",
   "embed_subs": "Встроить субтитры",
+  "write_subs": "Скачать субтитры (.srt)",
+  "split_chapters": "Нарезать по главам",
   "embed_thumb": "Встроить обложку",
   "sponsorblock": "Пропустить рекламные вставки (SponsorBlock)",
   "auth_cookies": "Авторизация (Cookies):",

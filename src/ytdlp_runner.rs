@@ -359,6 +359,22 @@ pub fn build_ytdlp_command(params: &Value) -> Result<(Vec<String>, String), Stri
     if params["embed_subs"].as_bool().unwrap_or(false) {
         cmd.push("--embed-subs".to_string());
     }
+    if params["write_subs"].as_bool().unwrap_or(false) {
+        let sub_langs = params["sub_langs"].as_str().unwrap_or("ru,en.*,all");
+        cmd.extend(vec![
+            "--write-subs".to_string(),
+            "--write-auto-subs".to_string(),
+            "--sub-format".to_string(),
+            "srt/best".to_string(),
+            "--convert-subs".to_string(),
+            "srt".to_string(),
+            "--sub-langs".to_string(),
+            sub_langs.to_string(),
+        ]);
+    }
+    if params["split_chapters"].as_bool().unwrap_or(false) {
+        cmd.push("--split-chapters".to_string());
+    }
     if params["embed_thumbnail"].as_bool().unwrap_or(false) {
         cmd.push("--embed-thumbnail".to_string());
     }
@@ -400,6 +416,9 @@ pub fn build_ytdlp_command(params: &Value) -> Result<(Vec<String>, String), Stri
         "30".to_string(),
         "--newline".to_string(),
         "--progress".to_string(),
+        "--no-colors".to_string(),
+        "--print".to_string(),
+        "after_move:__FINAL_OUT__:%(filepath)s".to_string(),
         "--".to_string(),
         url.to_string(),
     ]);
@@ -571,5 +590,42 @@ mod tests {
         assert_eq!(detect_platform("https://vimeo.com/12345678"), "Vimeo");
         assert_eq!(detect_platform("https://unknown-platform.org/watch?v=1"), "Unknown-platform");
         assert_eq!(detect_platform(""), "URL");
+    }
+
+    #[test]
+    fn test_build_ytdlp_command_subs_and_chapters() {
+        let params_default = json!({
+            "url": "https://www.youtube.com/watch?v=test"
+        });
+        let (cmd_default, _out) = build_ytdlp_command(&params_default).unwrap();
+        assert!(!cmd_default.iter().any(|a| a == "--write-subs"));
+        assert!(!cmd_default.iter().any(|a| a == "--split-chapters"));
+
+        let params_custom = json!({
+            "url": "https://www.youtube.com/watch?v=test",
+            "write_subs": true,
+            "sub_langs": "ru,en",
+            "split_chapters": true
+        });
+        let (cmd, _out) = build_ytdlp_command(&params_custom).unwrap();
+        assert!(cmd.iter().any(|a| a == "--write-subs"));
+        assert!(cmd.iter().any(|a| a == "--write-auto-subs"));
+        assert!(cmd.iter().any(|a| a == "--sub-format"));
+        assert!(cmd.iter().any(|a| a == "srt/best"));
+        assert!(cmd.iter().any(|a| a == "--convert-subs"));
+        assert!(cmd.iter().any(|a| a == "srt"));
+        assert!(cmd.iter().any(|a| a == "--sub-langs"));
+        let langs_idx = cmd.iter().position(|a| a == "--sub-langs").unwrap();
+        assert_eq!(cmd[langs_idx + 1], "ru,en");
+        assert!(cmd.iter().any(|a| a == "--split-chapters"));
+
+        // Default sub_langs fallback
+        let params_default_langs = json!({
+            "url": "https://www.youtube.com/watch?v=test",
+            "write_subs": true
+        });
+        let (cmd_langs, _out) = build_ytdlp_command(&params_default_langs).unwrap();
+        let default_langs_idx = cmd_langs.iter().position(|a| a == "--sub-langs").unwrap();
+        assert_eq!(cmd_langs[default_langs_idx + 1], "ru,en.*,all");
     }
 }
