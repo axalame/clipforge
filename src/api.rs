@@ -566,11 +566,13 @@ impl Api {
                             for entry in entries.flatten() {
                                 let side = entry.path();
                                 if side != p && side.is_file() {
-                                    if side.file_stem().and_then(|s| s.to_str()) == Some(stem) {
-                                        let s_ext = side.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
-                                        if matches!(s_ext.as_str(), "jpg" | "jpeg" | "webp" | "png" | "vtt" | "srt" | "part" | "ytdl" | "temp") {
-                                            let _ = std::fs::remove_file(&side);
-                                        }
+                                    let s_name = side.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                                    let s_stem = side.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+                                    let s_ext = side.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+                                    let is_match = (s_stem.eq_ignore_ascii_case(stem) || s_name.starts_with(&format!("{}.", stem)))
+                                        && matches!(s_ext.as_str(), "jpg" | "jpeg" | "webp" | "png" | "vtt" | "srt" | "part" | "ytdl" | "temp");
+                                    if is_match {
+                                        let _ = std::fs::remove_file(&side);
                                     }
                                 }
                             }

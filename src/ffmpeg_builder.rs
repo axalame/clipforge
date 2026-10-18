@@ -536,14 +536,16 @@ impl FFmpegBuilder {
             }
 
             "smart_blur_9_16" => {
-                let w = params["target_width"]
+                let raw_w = params["target_width"]
                     .as_i64()
                     .or_else(|| params["width"].as_i64())
                     .unwrap_or(1080);
-                let h = params["target_height"]
+                let raw_h = params["target_height"]
                     .as_i64()
                     .or_else(|| params["height"].as_i64())
                     .unwrap_or(1920);
+                let w = ((raw_w / 2) * 2).max(2);
+                let h = ((raw_h / 2) * 2).max(2);
                 let blur = params["blur"]
                     .as_i64()
                     .or_else(|| params["blur"].as_f64().map(|v| v.round() as i64))
@@ -570,6 +572,8 @@ impl FFmpegBuilder {
                     "0:a?".to_string(),
                     "-c:v".to_string(),
                     "libx264".to_string(),
+                    "-pix_fmt".to_string(),
+                    "yuv420p".to_string(),
                     "-preset".to_string(),
                     "medium".to_string(),
                     "-crf".to_string(),
@@ -1139,6 +1143,8 @@ mod tests {
 
         assert!(cmd.contains(&"-c:v".to_string()));
         assert!(cmd.contains(&"libx264".to_string()));
+        assert!(cmd.contains(&"-pix_fmt".to_string()));
+        assert!(cmd.contains(&"yuv420p".to_string()));
         assert!(cmd.contains(&"-preset".to_string()));
         assert!(cmd.contains(&"medium".to_string()));
         assert!(cmd.contains(&"-crf".to_string()));
