@@ -6,6 +6,7 @@ mod ffmpeg_builder;
 mod media_info;
 mod media_server;
 mod process_runner;
+mod single_instance;
 mod ytdlp_runner;
 
 use api::{Api, UserEvent};
@@ -68,6 +69,12 @@ fn load_tray_icon() -> Option<tray_icon::Icon> {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // 0. Single instance check: prevent multiple concurrent instances
+    let _single_instance_guard = match single_instance::check_single_instance() {
+        Some(guard) => guard,
+        None => return Ok(()),
+    };
+
     // 1. Start media streaming server on 127.0.0.1 (assigned free port)
     let media_server_url = start_media_server();
     println!("Native Rust Media Server listening at {}", media_server_url);
@@ -117,6 +124,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let window = window_builder.build(&event_loop)?;
+    single_instance::register_main_window(&window, proxy.clone());
 
     // 4. Initialize API controller
     let api = Arc::new(Api::new(proxy.clone()));
@@ -175,6 +183,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         *control_flow = ControlFlow::Wait;
 
         match event {
+            Event::UserEvent(UserEvent::RestoreWindow) => {
+                window.set_visible(true);
+                window.set_minimized(false);
+                window.set_focus();
+                let _ = webview.evaluate_script(
+                    "if (window.$message) { window.$message.warning('ClipForge уже запущен! Окно программы выведено на передний план.', { duration: 4000 }); }"
+                );
+            }
             Event::UserEvent(UserEvent::EvalJs(script)) => {
                 let _ = webview.evaluate_script(&script);
             }

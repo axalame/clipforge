@@ -44,5 +44,15 @@
   "clear_btn": "Очистить",
   "msg_output_dir_updated": "Папка сохранения обновлена",
   "msg_channel_set": "Канал yt-dlp переключен: ",
-  "msg_cookies_cleared": "Cookies очищены"
+  "msg_cookies_cleared": "Cookies очищены",
+  "download_btn": "Скачать",
+  "download_all_btn": "Скачать все компоненты (yt-dlp, Deno, FFmpeg)",
+  "clean_install_title": "Необходимые модули не установлены",
+  "clean_install_desc": "Для загрузки и обработки видео требуются yt-dlp, FFmpeg и Deno JS. Вы можете скачать и настроить их автоматически в один клик.",
+  "msg_downloading_component": "Загрузка и установка компонента...",
+  "msg_download_success": "Компонент успешно установлен!",
+  "msg_download_error": "Ошибка загрузки компонента",
+  "msg_downloading_all": "Загрузка всех необходимых компонентов... Это может занять пару минут.",
+  "msg_download_all_success": "Все компоненты (yt-dlp, Deno, FFmpeg) успешно установлены!",
+  "msg_download_all_partial": "Установка завершена. Проверьте статус компонентов."
 }

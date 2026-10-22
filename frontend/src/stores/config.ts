@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import type { AppConfig } from "@/types";
 import { apiClient } from "@/api/client";
 
@@ -15,10 +15,25 @@ export const useConfigStore = defineStore("config", () => {
   });
 
   const toolStatuses = ref({
-    ytdlp: { ok: false, version: "", path: "", checking: false },
-    deno: { ok: false, version: "", path: "", checking: false },
-    ffmpeg: { ok: false, version: "", path: "", checking: false },
+    ytdlp: { ok: false, version: "", path: "", checking: false, downloading: false },
+    deno: { ok: false, version: "", path: "", checking: false, downloading: false },
+    ffmpeg: { ok: false, version: "", path: "", checking: false, downloading: false },
   });
+
+  const isDownloadingAll = ref(false);
+  const downloadProgress = ref<Record<string, { percent: number; message: string }>>({});
+  const hasMissingRequiredTools = computed(() => {
+    return !toolStatuses.value.ytdlp.ok || !toolStatuses.value.ffmpeg.ok || !toolStatuses.value.deno.ok;
+  });
+
+  if (typeof window !== "undefined") {
+    (window as any).onComponentProgress = (data: { component: string; message: string; percent: number }) => {
+      downloadProgress.value[data.component] = {
+        percent: data.percent,
+        message: data.message,
+      };
+    };
+  }
 
   const appUpdateInfo = ref<{
     ok?: boolean;
@@ -117,6 +132,34 @@ export const useConfigStore = defineStore("config", () => {
     }
   };
 
+  const downloadComponent = async (name: "ytdlp" | "deno" | "ffmpeg" | "all") => {
+    if (name === "all") {
+      isDownloadingAll.value = true;
+      toolStatuses.value.ytdlp.downloading = true;
+      toolStatuses.value.deno.downloading = true;
+      toolStatuses.value.ffmpeg.downloading = true;
+    } else {
+      toolStatuses.value[name].downloading = true;
+    }
+
+    try {
+      const res = await apiClient.downloadTool(name);
+      await fetchConfig();
+      return res;
+    } catch (e: any) {
+      return { ok: false, msg: String(e) };
+    } finally {
+      if (name === "all") {
+        isDownloadingAll.value = false;
+        toolStatuses.value.ytdlp.downloading = false;
+        toolStatuses.value.deno.downloading = false;
+        toolStatuses.value.ffmpeg.downloading = false;
+      } else {
+        toolStatuses.value[name].downloading = false;
+      }
+    }
+  };
+
   const checkAllComponents = async () => {
     await fetchConfig();
   };
@@ -131,5 +174,9 @@ export const useConfigStore = defineStore("config", () => {
     checkComponent,
     checkAllComponents,
     checkAppUpdate,
+    downloadComponent,
+    isDownloadingAll,
+    downloadProgress,
+    hasMissingRequiredTools,
   };
 });

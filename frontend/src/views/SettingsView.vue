@@ -117,6 +117,29 @@
       </div>
     </div>
 
+    <!-- Clean Install Alert Banner -->
+    <div v-if="configStore.hasMissingRequiredTools" class="clean-install-banner">
+      <div class="banner-content">
+        <div class="banner-icon-box">
+          <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+        </div>
+        <div class="banner-text">
+          <div class="banner-title">{{ t('clean_install_title', 'Необходимые модули не установлены') }}</div>
+          <div class="banner-desc">{{ t('clean_install_desc', 'Для загрузки и обработки видео требуются yt-dlp, FFmpeg и Deno JS. Вы можете скачать и настроить их автоматически в один клик.') }}</div>
+        </div>
+      </div>
+      <n-button type="primary" size="medium" @click="downloadAllTools" :loading="configStore.isDownloadingAll" style="font-weight:600; white-space:nowrap;">
+        <template #icon>
+          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+        </template>
+        {{ t('download_all_btn', 'Скачать все компоненты (yt-dlp, Deno, FFmpeg)') }}
+      </n-button>
+    </div>
+
     <!-- 1. yt-dlp -->
     <div class="tool-card">
       <div class="tool-card-top">
@@ -128,7 +151,10 @@
         </div>
         <div class="tool-top-actions">
           <n-select v-model:value="ytdlpSource" :options="sourceOptions" size="small" style="width: 150px;" />
-          <n-button size="small" secondary @click="checkYtdlpUpdate" :loading="isCheckingUpdate">
+          <n-button v-if="!config.tools?.ytdlp?.ok" size="small" type="primary" @click="downloadTool('ytdlp')" :loading="configStore.toolStatuses.ytdlp.downloading">
+            📥 {{ t('download_btn', 'Скачать') }}
+          </n-button>
+          <n-button v-else size="small" secondary @click="checkYtdlpUpdate" :loading="isCheckingUpdate">
             {{ t('check_updates') }}
           </n-button>
           <n-button size="small" secondary @click="pickYtdlp">
@@ -176,7 +202,10 @@
         </div>
         <div class="tool-top-actions">
           <n-select v-model:value="denoSource" :options="sourceOptions" size="small" style="width: 150px;" />
-          <n-button size="small" secondary @click="checkDenoUpdate" :loading="isCheckingDenoUpdate">
+          <n-button v-if="!config.tools?.deno?.ok" size="small" type="primary" @click="downloadTool('deno')" :loading="configStore.toolStatuses.deno.downloading">
+            📥 {{ t('download_btn', 'Скачать') }}
+          </n-button>
+          <n-button v-else size="small" secondary @click="checkDenoUpdate" :loading="isCheckingDenoUpdate">
             {{ t('check_updates') }}
           </n-button>
           <n-button size="small" secondary @click="pickDeno">
@@ -219,7 +248,10 @@
         </div>
         <div class="tool-top-actions">
           <n-select v-model:value="ffmpegSource" :options="sourceOptions" size="small" style="width: 150px;" />
-          <n-button size="small" secondary @click="checkFfmpegUpdate" :loading="isCheckingFfmpegUpdate">
+          <n-button v-if="!config.tools?.ffmpeg?.ok" size="small" type="primary" @click="downloadTool('ffmpeg')" :loading="configStore.toolStatuses.ffmpeg.downloading">
+            📥 {{ t('download_btn', 'Скачать') }}
+          </n-button>
+          <n-button v-else size="small" secondary @click="checkFfmpegUpdate" :loading="isCheckingFfmpegUpdate">
             {{ t('check_updates') }}
           </n-button>
           <n-button size="small" secondary @click="pickFfmpegDir">
@@ -455,6 +487,40 @@ const saveConfig = async () => {
     await configStore.fetchConfig();
     message.success(t("msg_settings_saved"));
   } catch (e) {
+    message.error(String(e));
+  }
+};
+
+const downloadTool = async (name: "ytdlp" | "deno" | "ffmpeg") => {
+  const loadingMsg = message.loading(t("msg_downloading_component", "Загрузка и установка компонента..."), { duration: 0 });
+  try {
+    const res: any = await configStore.downloadComponent(name);
+    loadingMsg.destroy();
+    if (res && res.ok) {
+      message.success(res.msg || t("msg_download_success", "Компонент успешно установлен!"));
+    } else {
+      message.error(res?.msg || t("msg_download_error", "Ошибка загрузки компонента"));
+    }
+    await loadConfig();
+  } catch (e: any) {
+    loadingMsg.destroy();
+    message.error(String(e));
+  }
+};
+
+const downloadAllTools = async () => {
+  const loadingMsg = message.loading(t("msg_downloading_all", "Загрузка всех необходимых компонентов..."), { duration: 0 });
+  try {
+    const res: any = await configStore.downloadComponent("all");
+    loadingMsg.destroy();
+    if (res && res.ok) {
+      message.success(t("msg_download_all_success", "Все компоненты (yt-dlp, Deno, FFmpeg) успешно установлены!"));
+    } else {
+      message.warning(t("msg_download_all_partial", "Установка завершена. Проверьте статус компонентов."));
+    }
+    await loadConfig();
+  } catch (e: any) {
+    loadingMsg.destroy();
     message.error(String(e));
   }
 };

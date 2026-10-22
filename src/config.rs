@@ -108,8 +108,38 @@ impl AppConfig {
         }
     }
 
+    pub fn get_tools_dir() -> PathBuf {
+        if let Ok(appdata) = std::env::var("APPDATA") {
+            let p = PathBuf::from(&appdata).join("ClipForge").join("bin");
+            let _ = fs::create_dir_all(&p);
+            return p;
+        }
+        let p = PathBuf::from("bin");
+        let _ = fs::create_dir_all(&p);
+        p
+    }
+
     pub fn autodetect_tools(&mut self) {
-        // 1. Check Roaming directory from yt-dlp-gui
+        // 1. Check ClipForge native bin directory (%APPDATA%\ClipForge\bin)
+        let tools_dir = Self::get_tools_dir();
+        let appdata_ffmpeg = tools_dir.join("ffmpeg");
+        if appdata_ffmpeg.join("ffmpeg.exe").exists() && self.ffmpeg_dir.is_empty() {
+            self.ffmpeg_dir = appdata_ffmpeg.to_string_lossy().to_string();
+        } else if tools_dir.join("ffmpeg.exe").exists() && self.ffmpeg_dir.is_empty() {
+            self.ffmpeg_dir = tools_dir.to_string_lossy().to_string();
+        }
+
+        let appdata_ytdlp = tools_dir.join("yt-dlp.exe");
+        if appdata_ytdlp.exists() && self.ytdlp_path.is_empty() {
+            self.ytdlp_path = appdata_ytdlp.to_string_lossy().to_string();
+        }
+
+        let appdata_deno = tools_dir.join("deno.exe");
+        if appdata_deno.exists() && self.deno_path.is_empty() {
+            self.deno_path = appdata_deno.to_string_lossy().to_string();
+        }
+
+        // 2. Check Roaming directory from yt-dlp-gui
         if let Ok(user_profile) = std::env::var("USERPROFILE") {
             let roaming_ffmpeg = PathBuf::from(&user_profile)
                 .join("AppData")
@@ -144,13 +174,13 @@ impl AppConfig {
             }
         }
 
-        // 2. Check C:\yt-dlp\yt-dlp.exe
+        // 3. Check C:\yt-dlp\yt-dlp.exe
         let c_ytdlp = Path::new(r"C:\yt-dlp\yt-dlp.exe");
         if c_ytdlp.exists() && self.ytdlp_path.is_empty() {
             self.ytdlp_path = c_ytdlp.to_string_lossy().to_string();
         }
 
-        // 3. Fallback to system PATH
+        // 4. Fallback to system PATH
         if self.ffmpeg_dir.is_empty() && is_command_available("ffmpeg") {
             self.ffmpeg_dir = "PATH".to_string();
         }
@@ -169,6 +199,14 @@ impl AppConfig {
                 return p.to_string_lossy().to_string();
             }
         }
+        let native = Self::get_tools_dir().join("ffmpeg").join("ffmpeg.exe");
+        if native.exists() {
+            return native.to_string_lossy().to_string();
+        }
+        let native_root = Self::get_tools_dir().join("ffmpeg.exe");
+        if native_root.exists() {
+            return native_root.to_string_lossy().to_string();
+        }
         "ffmpeg".to_string()
     }
 
@@ -179,6 +217,14 @@ impl AppConfig {
                 return p.to_string_lossy().to_string();
             }
         }
+        let native = Self::get_tools_dir().join("ffmpeg").join("ffprobe.exe");
+        if native.exists() {
+            return native.to_string_lossy().to_string();
+        }
+        let native_root = Self::get_tools_dir().join("ffprobe.exe");
+        if native_root.exists() {
+            return native_root.to_string_lossy().to_string();
+        }
         "ffprobe".to_string()
     }
 
@@ -186,12 +232,20 @@ impl AppConfig {
         if !self.ytdlp_path.is_empty() && Path::new(&self.ytdlp_path).exists() {
             return self.ytdlp_path.clone();
         }
+        let native = Self::get_tools_dir().join("yt-dlp.exe");
+        if native.exists() {
+            return native.to_string_lossy().to_string();
+        }
         "yt-dlp".to_string()
     }
 
     pub fn deno_exe(&self) -> String {
         if !self.deno_path.is_empty() && Path::new(&self.deno_path).exists() {
             return self.deno_path.clone();
+        }
+        let native = Self::get_tools_dir().join("deno.exe");
+        if native.exists() {
+            return native.to_string_lossy().to_string();
         }
         if is_command_available("deno") {
             return "deno".to_string();

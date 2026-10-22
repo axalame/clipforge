@@ -22,6 +22,7 @@ declare global {
         update_ytdlp: () => Promise<any>;
         check_deno_update: () => Promise<any>;
         check_ffmpeg_update: () => Promise<any>;
+        download_tool: (name: string) => Promise<any>;
         cancel: () => Promise<any>;
         [key: string]: any;
       };
@@ -187,6 +188,11 @@ class ApiClient {
   async installAppUpdate(downloadUrl: string): Promise<any> {
     if (!this.rawApi) return { ok: false, msg: "API недоступно" };
     return this.rawApi.install_app_update(downloadUrl);
+  }
+
+  async downloadTool(name: string): Promise<any> {
+    if (!this.rawApi) return { ok: false, msg: "Native API unavailable" };
+    return this.rawApi.download_tool(name);
   }
 }
 

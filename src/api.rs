@@ -22,6 +22,7 @@ pub enum UserEvent {
     EvalJs(String),
     TrayIconEvent(tray_icon::TrayIconEvent),
     MenuEvent(tray_icon::menu::MenuEvent),
+    RestoreWindow,
 }
 
 pub struct ApiCallbacks {
@@ -137,6 +138,10 @@ impl Api {
             "check_deno_update" => self.check_deno_update(),
             "check_ffmpeg_update" => self.check_ffmpeg_update(),
             "check_app_update" => self.check_app_update(),
+            "download_tool" => {
+                let name = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
+                self.download_tool(name)
+            },
             "install_app_update" => {
                 let url = args.get(0).and_then(|v| v.as_str()).unwrap_or("");
                 self.install_app_update(url)
@@ -333,6 +338,331 @@ impl Api {
         }
 
         json!({ "ok": true, "msg": "Установщик запущен. Приложение обновляется..." })
+    }
+
+    fn emit_component_progress(&self, component: &str, msg: &str, percent: u32) {
+        let payload = json!({
+            "component": component,
+            "message": msg,
+            "percent": percent
+        }).to_string();
+        let _ = self.proxy.send_event(UserEvent::EvalJs(format!(
+            "if (window.onComponentProgress) window.onComponentProgress({});",
+            payload
+        )));
+    }
+
+    fn download_file_with_curl(url: &str, target_file: &Path, max_secs: u32) -> Result<(), String> {
+        let mut cmd = Command::new("curl.exe");
+        #[cfg(windows)]
+        cmd.creation_flags(CREATE_NO_WINDOW);
+        cmd.args([
+            "-L",
+            "--fail",
+            "--retry", "2",
+            "--max-time", &max_secs.to_string(),
+            "-o", target_file.to_str().unwrap_or("out.tmp"),
+            url,
+        ]);
+
+        let status = cmd.status().map_err(|e| format!("Не удалось запустить curl.exe: {}", e))?;
+        if !status.success() {
+            return Err(format!("curl.exe завершился с кодом ошибки: {}", status));
+        }
+        if !target_file.exists() || target_file.metadata().map(|m| m.len()).unwrap_or(0) == 0 {
+            return Err("Файл не был загружен или имеет нулевой размер".to_string());
+        }
+        Ok(())
+    }
+
+    fn extract_archive_zip(zip_path: &Path, dest_dir: &Path) -> Result<(), String> {
+        let _ = std::fs::create_dir_all(dest_dir);
+
+        // 1. Try tar.exe (fast, built into Windows 10/11)
+        let mut tar_cmd = Command::new("tar.exe");
+        #[cfg(windows)]
+        tar_cmd.creation_flags(CREATE_NO_WINDOW);
+        tar_cmd.args(["-xf", zip_path.to_str().unwrap_or(""), "-C", dest_dir.to_str().unwrap_or("")]);
+
+        if let Ok(st) = tar_cmd.status() {
+            if st.success() {
+                return Ok(());
+            }
+        }
+
+        // 2. Fallback to PowerShell Expand-Archive
+        let ps_script = format!(
+            "Expand-Archive -LiteralPath '{}' -DestinationPath '{}' -Force",
+            zip_path.to_string_lossy().replace('\'', "''"),
+            dest_dir.to_string_lossy().replace('\'', "''")
+        );
+        let mut ps_cmd = Command::new("powershell.exe");
+        #[cfg(windows)]
+        ps_cmd.creation_flags(CREATE_NO_WINDOW);
+        ps_cmd.args(["-NoProfile", "-Command", &ps_script]);
+
+        let ps_status = ps_cmd.status().map_err(|e| format!("Ошибка распаковки архива: {}", e))?;
+        if ps_status.success() {
+            Ok(())
+        } else {
+            Err("Не удалось распаковать архив с помощью tar.exe и PowerShell".to_string())
+        }
+    }
+
+    fn install_ytdlp(&self, bin_dir: &Path, temp_dir: &Path) -> Result<Value, String> {
+        let ytdlp_url = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe";
+        let temp_exe = temp_dir.join("yt-dlp.download.exe");
+        let target_exe = bin_dir.join("yt-dlp.exe");
+
+        let _ = std::fs::remove_file(&temp_exe);
+        Self::download_file_with_curl(ytdlp_url, &temp_exe, 180)?;
+
+        let _ = std::fs::remove_file(&target_exe);
+        std::fs::copy(&temp_exe, &target_exe).map_err(|e| format!("Не удалось сохранить yt-dlp.exe: {}", e))?;
+        let _ = std::fs::remove_file(&temp_exe);
+
+        let mut verify_cmd = Command::new(&target_exe);
+        #[cfg(windows)]
+        verify_cmd.creation_flags(CREATE_NO_WINDOW);
+        verify_cmd.arg("--version");
+        let ver = match verify_cmd.output() {
+            Ok(out) if out.status.success() => String::from_utf8_lossy(&out.stdout).trim().to_string(),
+            _ => "unknown".to_string(),
+        };
+
+        let mut cfg = AppConfig::load();
+        cfg.ytdlp_path = target_exe.to_string_lossy().to_string();
+        cfg.save();
+
+        Ok(json!({
+            "ok": true,
+            "version": ver,
+            "path": cfg.ytdlp_path,
+            "msg": format!("yt-dlp v{} успешно установлен!", ver)
+        }))
+    }
+
+    fn install_deno(&self, bin_dir: &Path, temp_dir: &Path) -> Result<Value, String> {
+        let deno_url = "https://github.com/denoland/deno/releases/latest/download/deno-x86_64-pc-windows-msvc.zip";
+        let temp_zip = temp_dir.join("deno.download.zip");
+        let extract_dir = temp_dir.join("deno_extract");
+        let target_exe = bin_dir.join("deno.exe");
+
+        let _ = std::fs::remove_file(&temp_zip);
+        let _ = std::fs::remove_dir_all(&extract_dir);
+
+        Self::download_file_with_curl(deno_url, &temp_zip, 180)?;
+        Self::extract_archive_zip(&temp_zip, &extract_dir)?;
+
+        let found_deno = extract_dir.join("deno.exe");
+        if !found_deno.exists() {
+            return Err("Исполняемый файл deno.exe не найден внутри загруженного архива".to_string());
+        }
+
+        let _ = std::fs::remove_file(&target_exe);
+        std::fs::copy(&found_deno, &target_exe).map_err(|e| format!("Не удалось сохранить deno.exe: {}", e))?;
+
+        let _ = std::fs::remove_file(&temp_zip);
+        let _ = std::fs::remove_dir_all(&extract_dir);
+
+        let mut verify_cmd = Command::new(&target_exe);
+        #[cfg(windows)]
+        verify_cmd.creation_flags(CREATE_NO_WINDOW);
+        verify_cmd.arg("--version");
+        let ver = match verify_cmd.output() {
+            Ok(out) if out.status.success() => {
+                let out_str = String::from_utf8_lossy(&out.stdout);
+                out_str.lines().next().unwrap_or("").replace("deno ", "").trim().to_string()
+            }
+            _ => "unknown".to_string(),
+        };
+
+        let mut cfg = AppConfig::load();
+        cfg.deno_path = target_exe.to_string_lossy().to_string();
+        cfg.save();
+
+        Ok(json!({
+            "ok": true,
+            "version": ver,
+            "path": cfg.deno_path,
+            "msg": format!("Deno JS v{} успешно установлен!", ver)
+        }))
+    }
+
+    fn install_ffmpeg(&self, bin_dir: &Path, temp_dir: &Path) -> Result<Value, String> {
+        let ffmpeg_url_gyan = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip";
+        let ffmpeg_url_btbn = "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip";
+
+        let temp_zip = temp_dir.join("ffmpeg.download.zip");
+        let extract_dir = temp_dir.join("ffmpeg_extract");
+        let ffmpeg_bin_dir = bin_dir.join("ffmpeg");
+        let _ = std::fs::create_dir_all(&ffmpeg_bin_dir);
+
+        let _ = std::fs::remove_file(&temp_zip);
+        let _ = std::fs::remove_dir_all(&extract_dir);
+
+        if Self::download_file_with_curl(ffmpeg_url_gyan, &temp_zip, 300).is_err() {
+            self.emit_component_progress("ffmpeg", "Загрузка с резервного зеркала GitHub...", 30);
+            Self::download_file_with_curl(ffmpeg_url_btbn, &temp_zip, 300)
+                .map_err(|e| format!("Не удалось скачать FFmpeg: {}", e))?;
+        }
+
+        self.emit_component_progress("ffmpeg", "Распаковка архива FFmpeg...", 70);
+        Self::extract_archive_zip(&temp_zip, &extract_dir)?;
+
+        // Find ffmpeg.exe and ffprobe.exe recursively
+        let mut found_ffmpeg: Option<std::path::PathBuf> = None;
+        let mut found_ffprobe: Option<std::path::PathBuf> = None;
+
+        fn find_executables(dir: &Path, ffmpeg: &mut Option<std::path::PathBuf>, ffprobe: &mut Option<std::path::PathBuf>) {
+            if let Ok(entries) = std::fs::read_dir(dir) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path.is_file() {
+                        if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                            if name.eq_ignore_ascii_case("ffmpeg.exe") {
+                                *ffmpeg = Some(path.clone());
+                            } else if name.eq_ignore_ascii_case("ffprobe.exe") {
+                                *ffprobe = Some(path.clone());
+                            }
+                        }
+                    } else if path.is_dir() {
+                        find_executables(&path, ffmpeg, ffprobe);
+                    }
+                }
+            }
+        }
+
+        find_executables(&extract_dir, &mut found_ffmpeg, &mut found_ffprobe);
+
+        let src_ffmpeg = match found_ffmpeg {
+            Some(p) => p,
+            None => return Err("ffmpeg.exe не найден в распакованном архиве".to_string()),
+        };
+        let src_ffprobe = match found_ffprobe {
+            Some(p) => p,
+            None => return Err("ffprobe.exe не найден в распакованном архиве".to_string()),
+        };
+
+        let target_ffmpeg = ffmpeg_bin_dir.join("ffmpeg.exe");
+        let target_ffprobe = ffmpeg_bin_dir.join("ffprobe.exe");
+
+        let _ = std::fs::remove_file(&target_ffmpeg);
+        let _ = std::fs::remove_file(&target_ffprobe);
+
+        std::fs::copy(&src_ffmpeg, &target_ffmpeg).map_err(|e| format!("Не удалось скопировать ffmpeg.exe: {}", e))?;
+        std::fs::copy(&src_ffprobe, &target_ffprobe).map_err(|e| format!("Не удалось скопировать ffprobe.exe: {}", e))?;
+
+        let _ = std::fs::remove_file(&temp_zip);
+        let _ = std::fs::remove_dir_all(&extract_dir);
+
+        let mut verify_cmd = Command::new(&target_ffmpeg);
+        #[cfg(windows)]
+        verify_cmd.creation_flags(CREATE_NO_WINDOW);
+        verify_cmd.arg("-version");
+        let ver = match verify_cmd.output() {
+            Ok(out) if out.status.success() => {
+                let s = String::from_utf8_lossy(&out.stdout);
+                s.replace("ffmpeg version ", "").split_whitespace().next().unwrap_or("Ready").to_string()
+            }
+            _ => "Ready".to_string(),
+        };
+
+        let mut cfg = AppConfig::load();
+        cfg.ffmpeg_dir = ffmpeg_bin_dir.to_string_lossy().to_string();
+        cfg.save();
+
+        Ok(json!({
+            "ok": true,
+            "version": ver,
+            "path": cfg.ffmpeg_dir,
+            "msg": format!("FFmpeg & FFprobe v{} успешно установлены!", ver)
+        }))
+    }
+
+    fn download_tool(&self, name: &str) -> Value {
+        let bin_dir = AppConfig::get_tools_dir();
+        let _ = std::fs::create_dir_all(&bin_dir);
+
+        let temp_dir = std::env::temp_dir().join("clipforge_component_downloads");
+        let _ = std::fs::create_dir_all(&temp_dir);
+
+        match name {
+            "ytdlp" => {
+                self.emit_component_progress("ytdlp", "Загрузка yt-dlp.exe...", 10);
+                match self.install_ytdlp(&bin_dir, &temp_dir) {
+                    Ok(val) => {
+                        self.emit_component_progress("ytdlp", "yt-dlp успешно установлен!", 100);
+                        val
+                    }
+                    Err(e) => {
+                        self.emit_component_progress("ytdlp", &format!("Ошибка: {}", e), 0);
+                        json!({ "ok": false, "msg": e })
+                    }
+                }
+            }
+            "deno" => {
+                self.emit_component_progress("deno", "Загрузка Deno JS Runtime...", 10);
+                match self.install_deno(&bin_dir, &temp_dir) {
+                    Ok(val) => {
+                        self.emit_component_progress("deno", "Deno JS успешно установлен!", 100);
+                        val
+                    }
+                    Err(e) => {
+                        self.emit_component_progress("deno", &format!("Ошибка: {}", e), 0);
+                        json!({ "ok": false, "msg": e })
+                    }
+                }
+            }
+            "ffmpeg" => {
+                self.emit_component_progress("ffmpeg", "Загрузка архива FFmpeg & FFprobe...", 10);
+                match self.install_ffmpeg(&bin_dir, &temp_dir) {
+                    Ok(val) => {
+                        self.emit_component_progress("ffmpeg", "FFmpeg & FFprobe успешно установлены!", 100);
+                        val
+                    }
+                    Err(e) => {
+                        self.emit_component_progress("ffmpeg", &format!("Ошибка: {}", e), 0);
+                        json!({ "ok": false, "msg": e })
+                    }
+                }
+            }
+            "all" => {
+                let mut results = serde_json::Map::new();
+
+                self.emit_component_progress("all", "[1/3] Загрузка yt-dlp...", 15);
+                let yt_res = self.install_ytdlp(&bin_dir, &temp_dir);
+                results.insert("ytdlp".to_string(), match &yt_res {
+                    Ok(v) => v.clone(),
+                    Err(e) => json!({ "ok": false, "msg": e }),
+                });
+
+                self.emit_component_progress("all", "[2/3] Загрузка Deno JS...", 50);
+                let deno_res = self.install_deno(&bin_dir, &temp_dir);
+                results.insert("deno".to_string(), match &deno_res {
+                    Ok(v) => v.clone(),
+                    Err(e) => json!({ "ok": false, "msg": e }),
+                });
+
+                self.emit_component_progress("all", "[3/3] Загрузка FFmpeg + FFprobe...", 80);
+                let ff_res = self.install_ffmpeg(&bin_dir, &temp_dir);
+                results.insert("ffmpeg".to_string(), match &ff_res {
+                    Ok(v) => v.clone(),
+                    Err(e) => json!({ "ok": false, "msg": e }),
+                });
+
+                let all_ok = yt_res.is_ok() && deno_res.is_ok() && ff_res.is_ok();
+                self.emit_component_progress("all", if all_ok { "Все компоненты успешно установлены!" } else { "Установка завершена с замечаниями" }, 100);
+
+                let cfg = AppConfig::load();
+                json!({
+                    "ok": all_ok,
+                    "results": results,
+                    "tools": cfg.validate_tools()
+                })
+            }
+            _ => json!({ "ok": false, "msg": format!("Неизвестный компонент: {}", name) }),
+        }
     }
 
     fn get_config(&self) -> Value {

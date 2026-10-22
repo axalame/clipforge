@@ -1,4 +1,5 @@
 @echo off
+set "PATH=%LOCALAPPDATA%\Programs\Git\cmd;C:\Program Files\nodejs;%USERPROFILE%\.cargo\bin;C:\Users\PC\AppData\Local\Microsoft\WinGet\Packages\BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe\mingw64\bin;%PATH%"
 title ClipForge Fast Test
 echo ========================================================
 echo   [ClipForge] Fast Testing Mode (No Rust rebuild)

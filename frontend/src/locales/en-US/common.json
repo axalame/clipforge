@@ -92,5 +92,7 @@
   "notify_batch_finished": "All files in queue successfully processed",
   "update_available": "New version",
   "update_action": "Update",
-  "update_click_hint": "ClipForge update available! Click to open settings"
+  "update_click_hint": "ClipForge update available! Click to open settings",
+  "missing_tools_warning": "yt-dlp, FFmpeg, or Deno JS modules not found.",
+  "install_in_settings": "Download in Settings ⚙️"
 }

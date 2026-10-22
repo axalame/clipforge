@@ -92,5 +92,7 @@
   "notify_batch_finished": "Все файлы очереди успешно обработаны",
   "update_available": "Новая версия",
   "update_action": "Обновить",
-  "update_click_hint": "Доступно обновление ClipForge! Нажмите, чтобы перейти в настройки"
+  "update_click_hint": "Доступно обновление ClipForge! Нажмите, чтобы перейти в настройки",
+  "missing_tools_warning": "Не установлены модули yt-dlp, FFmpeg или Deno JS.",
+  "install_in_settings": "Скачать в настройках ⚙️"
 }

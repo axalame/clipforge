@@ -24,6 +24,18 @@
     <div v-show="ytSubNav === 'download'" class="yt-tab-pane">
       <!-- STEP 1: BEFORE URL ANALYSIS -->
       <div v-if="!ytVideoMeta" class="yt-welcome-container">
+        <div v-if="configStore.hasMissingRequiredTools" class="yt-missing-tools-alert" style="margin-bottom:12px;">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <svg viewBox="0 0 24 24" width="18" height="18" stroke="#f59e0b" stroke-width="2" fill="none">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            <span>{{ t('missing_tools_warning', 'Не установлены модули yt-dlp, FFmpeg или Deno JS.') }}</span>
+          </div>
+          <n-button size="small" type="primary" secondary @click="appStore.activeNav = 'settings'">
+            {{ t('install_in_settings', 'Скачать в настройках ⚙️') }}
+          </n-button>
+        </div>
         <div class="yt-welcome-title">{{ t('welcome_title') }}</div>
 
         <div class="yt-mode-pills">

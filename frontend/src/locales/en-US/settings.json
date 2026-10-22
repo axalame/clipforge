@@ -44,5 +44,15 @@
   "clear_btn": "Clear",
   "msg_output_dir_updated": "Output directory updated",
   "msg_channel_set": "yt-dlp channel set to: ",
-  "msg_cookies_cleared": "Cookies cleared"
+  "msg_cookies_cleared": "Cookies cleared",
+  "download_btn": "Download",
+  "download_all_btn": "Download all components (yt-dlp, Deno, FFmpeg)",
+  "clean_install_title": "Required components not installed",
+  "clean_install_desc": "yt-dlp, FFmpeg, and Deno JS are required for downloading and processing media. You can download and configure them automatically in one click.",
+  "msg_downloading_component": "Downloading and installing component...",
+  "msg_download_success": "Component installed successfully!",
+  "msg_download_error": "Failed to download component",
+  "msg_downloading_all": "Downloading all required components... This may take a minute.",
+  "msg_download_all_success": "All components (yt-dlp, Deno, FFmpeg) installed successfully!",
+  "msg_download_all_partial": "Installation completed with warnings. Check component statuses."
 }
