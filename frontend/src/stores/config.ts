@@ -32,6 +32,23 @@ export const useConfigStore = defineStore("config", () => {
         percent: data.percent,
         message: data.message,
       };
+
+      if (isDownloadingAll.value) {
+        let overall = 0;
+        if (data.component === "ytdlp") {
+          overall = Math.round(data.percent * 0.25);
+        } else if (data.component === "deno") {
+          overall = 25 + Math.round(data.percent * 0.30);
+        } else if (data.component === "ffmpeg") {
+          overall = 55 + Math.round(data.percent * 0.45);
+        } else if (data.component === "all") {
+          overall = data.percent;
+        }
+        downloadProgress.value.all = {
+          percent: Math.min(overall, 100),
+          message: data.message,
+        };
+      }
     };
   }
 
@@ -135,11 +152,13 @@ export const useConfigStore = defineStore("config", () => {
   const downloadComponent = async (name: "ytdlp" | "deno" | "ffmpeg" | "all") => {
     if (name === "all") {
       isDownloadingAll.value = true;
+      downloadProgress.value.all = { percent: 1, message: "Подготовка к загрузке..." };
       toolStatuses.value.ytdlp.downloading = true;
       toolStatuses.value.deno.downloading = true;
       toolStatuses.value.ffmpeg.downloading = true;
     } else {
       toolStatuses.value[name].downloading = true;
+      downloadProgress.value[name] = { percent: 1, message: "Подключение..." };
     }
 
     try {

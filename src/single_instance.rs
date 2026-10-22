@@ -25,10 +25,6 @@ mod win32 {
     pub const ERROR_ALREADY_EXISTS: DWORD = 183;
     pub const SW_SHOW: i32 = 5;
     pub const SW_RESTORE: i32 = 9;
-    pub const MB_OK: UINT = 0x00000000;
-    pub const MB_ICONINFORMATION: UINT = 0x00000040;
-    pub const MB_TOPMOST: UINT = 0x00040000;
-    pub const MB_SETFOREGROUND: UINT = 0x00010000;
     pub const WM_NCDESTROY: UINT = 0x0082;
 
     #[link(name = "kernel32")]
@@ -48,7 +44,6 @@ mod win32 {
         pub fn ShowWindow(hWnd: HWND, nCmdShow: i32) -> BOOL;
         pub fn SetForegroundWindow(hWnd: HWND) -> BOOL;
         pub fn BringWindowToTop(hWnd: HWND) -> BOOL;
-        pub fn MessageBoxW(hWnd: HWND, lpText: LPCWSTR, lpCaption: LPCWSTR, uType: UINT) -> i32;
         pub fn EnumWindows(lpEnumFunc: WNDENUMPROC, lParam: LPARAM) -> BOOL;
         pub fn SetPropW(hWnd: HWND, lpString: LPCWSTR, hData: HANDLE) -> BOOL;
         pub fn GetPropW(hWnd: HWND, lpString: LPCWSTR) -> HANDLE;
@@ -93,7 +88,6 @@ pub fn to_wide(s: &str) -> Vec<u16> {
 }
 
 pub const APP_MUTEX_NAME: &str = "Local\\ClipForge_SingleInstance_App_Mutex_2026";
-pub const ALERT_MUTEX_NAME: &str = "Local\\ClipForge_SingleInstance_Alert_Mutex_2026";
 pub const MARKER_PROP_NAME: &str = "ClipForge_SingleInstance_Marker";
 pub const RESTORE_MSG_NAME: &str = "ClipForge_RestoreWindow_Message";
 const SUBCLASS_ID: usize = 0xCF01;
@@ -208,25 +202,6 @@ pub fn check_single_instance() -> Option<SingleInstanceGuard> {
                     win32::ShowWindow(hwnd, win32::SW_SHOW);
                     win32::BringWindowToTop(hwnd);
                     win32::SetForegroundWindow(hwnd);
-                }
-            }
-
-            // 2. Show native warning message box to user (at most one active alert dialog to avoid spam)
-            let alert_mutex_name = to_wide(ALERT_MUTEX_NAME);
-            let alert_mutex = unsafe { win32::CreateMutexW(std::ptr::null_mut(), 1, alert_mutex_name.as_ptr()) };
-            let alert_err = unsafe { win32::GetLastError() };
-            if !alert_mutex.is_null() && alert_err != win32::ERROR_ALREADY_EXISTS {
-                let caption = to_wide("ClipForge");
-                let message = to_wide("Приложение ClipForge уже запущено.\n\nОкно программы выведено на передний план.");
-                let flags = win32::MB_OK | win32::MB_ICONINFORMATION | win32::MB_TOPMOST | win32::MB_SETFOREGROUND;
-
-                unsafe {
-                    win32::MessageBoxW(std::ptr::null_mut(), message.as_ptr(), caption.as_ptr(), flags);
-                    win32::CloseHandle(alert_mutex);
-                }
-            } else if !alert_mutex.is_null() {
-                unsafe {
-                    win32::CloseHandle(alert_mutex);
                 }
             }
 

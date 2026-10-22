@@ -187,9 +187,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 window.set_visible(true);
                 window.set_minimized(false);
                 window.set_focus();
-                let _ = webview.evaluate_script(
-                    "if (window.$message) { window.$message.warning('ClipForge уже запущен! Окно программы выведено на передний план.', { duration: 4000 }); }"
-                );
             }
             Event::UserEvent(UserEvent::EvalJs(script)) => {
                 let _ = webview.evaluate_script(&script);

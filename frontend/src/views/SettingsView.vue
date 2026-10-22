@@ -138,6 +138,24 @@
         </template>
         {{ t('download_all_btn', 'Скачать все компоненты (yt-dlp, Deno, FFmpeg)') }}
       </n-button>
+
+      <!-- All Components Download Progress -->
+      <div v-if="configStore.isDownloadingAll || (configStore.downloadProgress.all && configStore.downloadProgress.all.percent > 0)" class="banner-progress-box">
+        <div class="progress-info-row">
+          <span class="progress-msg">{{ configStore.downloadProgress.all.message }}</span>
+          <span class="progress-pct">{{ configStore.downloadProgress.all.percent }}%</span>
+        </div>
+        <n-progress
+          type="line"
+          :percentage="configStore.downloadProgress.all.percent"
+          :show-indicator="false"
+          :processing="configStore.isDownloadingAll"
+          :height="6"
+          color="#2080f0"
+          :status="configStore.downloadProgress.all.percent === 100 ? 'success' : 'default'"
+          style="margin-top: 6px;"
+        />
+      </div>
     </div>
 
     <!-- 1. yt-dlp -->
@@ -189,6 +207,24 @@
           </n-button>
         </div>
       </div>
+
+      <!-- ytdlp Download Progress -->
+      <div v-if="configStore.toolStatuses.ytdlp.downloading || (configStore.downloadProgress.ytdlp && configStore.downloadProgress.ytdlp.percent > 0 && configStore.downloadProgress.ytdlp.percent < 100)" class="tool-progress-box">
+        <div class="progress-info-row">
+          <span class="progress-msg">{{ configStore.downloadProgress.ytdlp?.message || t('downloading', 'Скачивание...') }}</span>
+          <span class="progress-pct">{{ configStore.downloadProgress.ytdlp?.percent || 0 }}%</span>
+        </div>
+        <n-progress
+          type="line"
+          :percentage="configStore.downloadProgress.ytdlp?.percent || 0"
+          :show-indicator="false"
+          :processing="configStore.toolStatuses.ytdlp.downloading"
+          :height="6"
+          color="#2080f0"
+          :status="configStore.downloadProgress.ytdlp?.percent === 100 ? 'success' : 'default'"
+          style="margin-top: 6px;"
+        />
+      </div>
     </div>
 
     <!-- 2. Deno JS Runtime -->
@@ -235,6 +271,24 @@
           </n-button>
         </div>
       </div>
+
+      <!-- Deno Download Progress -->
+      <div v-if="configStore.toolStatuses.deno.downloading || (configStore.downloadProgress.deno && configStore.downloadProgress.deno.percent > 0 && configStore.downloadProgress.deno.percent < 100)" class="tool-progress-box">
+        <div class="progress-info-row">
+          <span class="progress-msg">{{ configStore.downloadProgress.deno?.message || t('downloading', 'Скачивание...') }}</span>
+          <span class="progress-pct">{{ configStore.downloadProgress.deno?.percent || 0 }}%</span>
+        </div>
+        <n-progress
+          type="line"
+          :percentage="configStore.downloadProgress.deno?.percent || 0"
+          :show-indicator="false"
+          :processing="configStore.toolStatuses.deno.downloading"
+          :height="6"
+          color="#2080f0"
+          :status="configStore.downloadProgress.deno?.percent === 100 ? 'success' : 'default'"
+          style="margin-top: 6px;"
+        />
+      </div>
     </div>
 
     <!-- 3. FFmpeg + FFprobe -->
@@ -280,6 +334,24 @@
             <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" fill="none"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
           </n-button>
         </div>
+      </div>
+
+      <!-- FFmpeg Download Progress -->
+      <div v-if="configStore.toolStatuses.ffmpeg.downloading || (configStore.downloadProgress.ffmpeg && configStore.downloadProgress.ffmpeg.percent > 0 && configStore.downloadProgress.ffmpeg.percent < 100)" class="tool-progress-box">
+        <div class="progress-info-row">
+          <span class="progress-msg">{{ configStore.downloadProgress.ffmpeg?.message || t('downloading', 'Скачивание...') }}</span>
+          <span class="progress-pct">{{ configStore.downloadProgress.ffmpeg?.percent || 0 }}%</span>
+        </div>
+        <n-progress
+          type="line"
+          :percentage="configStore.downloadProgress.ffmpeg?.percent || 0"
+          :show-indicator="false"
+          :processing="configStore.toolStatuses.ffmpeg.downloading"
+          :height="6"
+          color="#2080f0"
+          :status="configStore.downloadProgress.ffmpeg?.percent === 100 ? 'success' : 'default'"
+          style="margin-top: 6px;"
+        />
       </div>
     </div>
 
@@ -396,7 +468,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
-import { NButton, NSelect, useMessage } from "naive-ui";
+import { NButton, NSelect, NProgress, useMessage } from "naive-ui";
 import { useAppStore } from "@/stores/app";
 import { useConfigStore } from "@/stores/config";
 import { apiClient } from "@/api/client";

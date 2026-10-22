@@ -352,7 +352,55 @@ impl Api {
         )));
     }
 
-    fn download_file_with_curl(url: &str, target_file: &Path, max_secs: u32) -> Result<(), String> {
+    fn download_file_with_curl(
+        &self,
+        component: &str,
+        url: &str,
+        target_file: &Path,
+        max_secs: u32,
+        expected_size_mb: f64,
+        pct_start: u32,
+        pct_end: u32,
+        stage_desc: &str,
+    ) -> Result<(), String> {
+        let (stop_tx, stop_rx) = std::sync::mpsc::channel();
+        let target_path_clone = target_file.to_path_buf();
+        let proxy = self.proxy.clone();
+        let comp_str = component.to_string();
+        let stage_str = stage_desc.to_string();
+
+        let monitor_handle = std::thread::spawn(move || {
+            let expected_bytes = (expected_size_mb * 1024.0 * 1024.0) as u64;
+            let mut last_pct = pct_start;
+            loop {
+                if stop_rx.try_recv().is_ok() {
+                    break;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(250));
+                if let Ok(meta) = target_path_clone.metadata() {
+                    let current = meta.len();
+                    if expected_bytes > 0 {
+                        let ratio = (current as f64 / expected_bytes as f64).clamp(0.0, 1.0);
+                        let calculated_pct = pct_start + (((pct_end - pct_start) as f64 * ratio) as u32);
+                        if calculated_pct > last_pct {
+                            last_pct = calculated_pct;
+                            let mb_curr = current as f64 / 1_048_576.0;
+                            let msg = format!("{}: {:.1} / {:.1} MB ({}%)", stage_str, mb_curr, expected_size_mb, calculated_pct);
+                            let payload = json!({
+                                "component": comp_str,
+                                "message": msg,
+                                "percent": calculated_pct
+                            }).to_string();
+                            let _ = proxy.send_event(UserEvent::EvalJs(format!(
+                                "if (window.onComponentProgress) window.onComponentProgress({});",
+                                payload
+                            )));
+                        }
+                    }
+                }
+            }
+        });
+
         let mut cmd = Command::new("curl.exe");
         #[cfg(windows)]
         cmd.creation_flags(CREATE_NO_WINDOW);
@@ -365,9 +413,13 @@ impl Api {
             url,
         ]);
 
-        let status = cmd.status().map_err(|e| format!("Не удалось запустить curl.exe: {}", e))?;
-        if !status.success() {
-            return Err(format!("curl.exe завершился с кодом ошибки: {}", status));
+        let status = cmd.status().map_err(|e| format!("Не удалось запустить curl.exe: {}", e));
+        let _ = stop_tx.send(());
+        let _ = monitor_handle.join();
+
+        let st = status?;
+        if !st.success() {
+            return Err(format!("curl.exe завершился с кодом ошибки: {}", st));
         }
         if !target_file.exists() || target_file.metadata().map(|m| m.len()).unwrap_or(0) == 0 {
             return Err("Файл не был загружен или имеет нулевой размер".to_string());
@@ -409,30 +461,88 @@ impl Api {
         }
     }
 
-    fn install_ytdlp(&self, bin_dir: &Path, temp_dir: &Path) -> Result<Value, String> {
-        let ytdlp_url = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe";
-        let temp_exe = temp_dir.join("yt-dlp.download.exe");
-        let target_exe = bin_dir.join("yt-dlp.exe");
-
-        let _ = std::fs::remove_file(&temp_exe);
-        Self::download_file_with_curl(ytdlp_url, &temp_exe, 180)?;
-
-        let _ = std::fs::remove_file(&target_exe);
-        std::fs::copy(&temp_exe, &target_exe).map_err(|e| format!("Не удалось сохранить yt-dlp.exe: {}", e))?;
-        let _ = std::fs::remove_file(&temp_exe);
-
-        let mut verify_cmd = Command::new(&target_exe);
+    fn replace_executable(temp_path: &Path, target_path: &Path) -> Result<(), String> {
         #[cfg(windows)]
-        verify_cmd.creation_flags(CREATE_NO_WINDOW);
-        verify_cmd.arg("--version");
-        let ver = match verify_cmd.output() {
-            Ok(out) if out.status.success() => String::from_utf8_lossy(&out.stdout).trim().to_string(),
-            _ => "unknown".to_string(),
+        {
+            let backup_path = target_path.with_extension("backup.exe");
+            let _ = std::fs::remove_file(&backup_path);
+            if target_path.exists() {
+                let _ = std::fs::rename(target_path, &backup_path);
+            }
+            if let Err(e) = std::fs::rename(temp_path, target_path) {
+                if let Err(copy_err) = std::fs::copy(temp_path, target_path) {
+                    if backup_path.exists() {
+                        let _ = std::fs::rename(&backup_path, target_path);
+                    }
+                    return Err(format!("Не удалось заменить исполняемый файл: {} (copy: {})", e, copy_err));
+                }
+                let _ = std::fs::remove_file(temp_path);
+            }
+            let _ = std::fs::remove_file(backup_path);
+            Ok(())
+        }
+        #[cfg(not(windows))]
+        {
+            std::fs::rename(temp_path, target_path).map_err(|e| format!("Не удалось заменить исполняемый файл: {}", e))
+        }
+    }
+
+    fn verify_executable(path: &Path, version_arg: &str) -> Result<String, String> {
+        let mut cmd = Command::new(path);
+        #[cfg(windows)]
+        cmd.creation_flags(CREATE_NO_WINDOW);
+        cmd.arg(version_arg);
+        match cmd.output() {
+            Ok(out) if out.status.success() && !out.stdout.is_empty() => {
+                Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
+            }
+            Ok(out) => {
+                let err = String::from_utf8_lossy(&out.stderr).trim().to_string();
+                Err(if !err.is_empty() { err } else { format!("exit_code: {:?}", out.status.code()) })
+            }
+            Err(e) => Err(format!("Не удалось запустить файл: {}", e)),
+        }
+    }
+
+    fn install_ytdlp(&self, bin_dir: &Path, _temp_dir: &Path) -> Result<Value, String> {
+        let cfg = AppConfig::load();
+        let channel = cfg.ytdlp_channel.trim();
+        let repo = match channel {
+            "nightly" => "yt-dlp/yt-dlp-nightly-builds",
+            "master" => "yt-dlp/yt-dlp-master-builds",
+            _ => "yt-dlp/yt-dlp",
         };
+        let ytdlp_url = format!("https://github.com/{}/releases/latest/download/yt-dlp.exe", repo);
+        let target_exe = bin_dir.join("yt-dlp.exe");
+        let temp_exe = bin_dir.join("yt-dlp.download.exe");
+
+        let _ = std::fs::remove_file(&temp_exe);
+        self.download_file_with_curl(
+            "ytdlp",
+            &ytdlp_url,
+            &temp_exe,
+            180,
+            18.5,
+            0,
+            90,
+            "Скачивание yt-dlp.exe",
+        )?;
+
+        self.emit_component_progress("ytdlp", "Проверка версии yt-dlp...", 95);
+        let ver = Self::verify_executable(&temp_exe, "--version")
+            .map_err(|e| {
+                let _ = std::fs::remove_file(&temp_exe);
+                format!("Ошибка проверки yt-dlp: {}", e)
+            })?;
+
+        self.emit_component_progress("ytdlp", "Сохранение yt-dlp.exe...", 98);
+        Self::replace_executable(&temp_exe, &target_exe)?;
 
         let mut cfg = AppConfig::load();
         cfg.ytdlp_path = target_exe.to_string_lossy().to_string();
         cfg.save();
+
+        self.emit_component_progress("ytdlp", "yt-dlp успешно установлен!", 100);
 
         Ok(json!({
             "ok": true,
@@ -444,42 +554,56 @@ impl Api {
 
     fn install_deno(&self, bin_dir: &Path, temp_dir: &Path) -> Result<Value, String> {
         let deno_url = "https://github.com/denoland/deno/releases/latest/download/deno-x86_64-pc-windows-msvc.zip";
-        let temp_zip = temp_dir.join("deno.download.zip");
-        let extract_dir = temp_dir.join("deno_extract");
         let target_exe = bin_dir.join("deno.exe");
+        let temp_zip = bin_dir.join("deno.download.zip");
+        let temp_exe = bin_dir.join("deno.download.exe");
+        let extract_dir = temp_dir.join("deno_extract");
 
         let _ = std::fs::remove_file(&temp_zip);
+        let _ = std::fs::remove_file(&temp_exe);
         let _ = std::fs::remove_dir_all(&extract_dir);
 
-        Self::download_file_with_curl(deno_url, &temp_zip, 180)?;
+        self.download_file_with_curl(
+            "deno",
+            deno_url,
+            &temp_zip,
+            180,
+            35.5,
+            0,
+            80,
+            "Скачивание Deno JS",
+        )?;
+
+        self.emit_component_progress("deno", "Распаковка Deno JS...", 85);
         Self::extract_archive_zip(&temp_zip, &extract_dir)?;
 
         let found_deno = extract_dir.join("deno.exe");
         if !found_deno.exists() {
+            let _ = std::fs::remove_file(&temp_zip);
+            let _ = std::fs::remove_dir_all(&extract_dir);
             return Err("Исполняемый файл deno.exe не найден внутри загруженного архива".to_string());
         }
 
-        let _ = std::fs::remove_file(&target_exe);
-        std::fs::copy(&found_deno, &target_exe).map_err(|e| format!("Не удалось сохранить deno.exe: {}", e))?;
-
+        let _ = std::fs::copy(&found_deno, &temp_exe);
         let _ = std::fs::remove_file(&temp_zip);
         let _ = std::fs::remove_dir_all(&extract_dir);
 
-        let mut verify_cmd = Command::new(&target_exe);
-        #[cfg(windows)]
-        verify_cmd.creation_flags(CREATE_NO_WINDOW);
-        verify_cmd.arg("--version");
-        let ver = match verify_cmd.output() {
-            Ok(out) if out.status.success() => {
-                let out_str = String::from_utf8_lossy(&out.stdout);
-                out_str.lines().next().unwrap_or("").replace("deno ", "").trim().to_string()
-            }
-            _ => "unknown".to_string(),
-        };
+        self.emit_component_progress("deno", "Проверка Deno JS...", 95);
+        let ver_raw = Self::verify_executable(&temp_exe, "--version")
+            .map_err(|e| {
+                let _ = std::fs::remove_file(&temp_exe);
+                format!("Ошибка проверки Deno JS: {}", e)
+            })?;
+        let ver = ver_raw.lines().next().unwrap_or("").replace("deno ", "").trim().to_string();
+
+        self.emit_component_progress("deno", "Сохранение Deno JS...", 98);
+        Self::replace_executable(&temp_exe, &target_exe)?;
 
         let mut cfg = AppConfig::load();
         cfg.deno_path = target_exe.to_string_lossy().to_string();
         cfg.save();
+
+        self.emit_component_progress("deno", "Deno JS успешно установлен!", 100);
 
         Ok(json!({
             "ok": true,
@@ -490,87 +614,135 @@ impl Api {
     }
 
     fn install_ffmpeg(&self, bin_dir: &Path, temp_dir: &Path) -> Result<Value, String> {
-        let ffmpeg_url_gyan = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip";
-        let ffmpeg_url_btbn = "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip";
-
-        let temp_zip = temp_dir.join("ffmpeg.download.zip");
-        let extract_dir = temp_dir.join("ffmpeg_extract");
         let ffmpeg_bin_dir = bin_dir.join("ffmpeg");
         let _ = std::fs::create_dir_all(&ffmpeg_bin_dir);
-
-        let _ = std::fs::remove_file(&temp_zip);
-        let _ = std::fs::remove_dir_all(&extract_dir);
-
-        if Self::download_file_with_curl(ffmpeg_url_gyan, &temp_zip, 300).is_err() {
-            self.emit_component_progress("ffmpeg", "Загрузка с резервного зеркала GitHub...", 30);
-            Self::download_file_with_curl(ffmpeg_url_btbn, &temp_zip, 300)
-                .map_err(|e| format!("Не удалось скачать FFmpeg: {}", e))?;
-        }
-
-        self.emit_component_progress("ffmpeg", "Распаковка архива FFmpeg...", 70);
-        Self::extract_archive_zip(&temp_zip, &extract_dir)?;
-
-        // Find ffmpeg.exe and ffprobe.exe recursively
-        let mut found_ffmpeg: Option<std::path::PathBuf> = None;
-        let mut found_ffprobe: Option<std::path::PathBuf> = None;
-
-        fn find_executables(dir: &Path, ffmpeg: &mut Option<std::path::PathBuf>, ffprobe: &mut Option<std::path::PathBuf>) {
-            if let Ok(entries) = std::fs::read_dir(dir) {
-                for entry in entries.flatten() {
-                    let path = entry.path();
-                    if path.is_file() {
-                        if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                            if name.eq_ignore_ascii_case("ffmpeg.exe") {
-                                *ffmpeg = Some(path.clone());
-                            } else if name.eq_ignore_ascii_case("ffprobe.exe") {
-                                *ffprobe = Some(path.clone());
-                            }
-                        }
-                    } else if path.is_dir() {
-                        find_executables(&path, ffmpeg, ffprobe);
-                    }
-                }
-            }
-        }
-
-        find_executables(&extract_dir, &mut found_ffmpeg, &mut found_ffprobe);
-
-        let src_ffmpeg = match found_ffmpeg {
-            Some(p) => p,
-            None => return Err("ffmpeg.exe не найден в распакованном архиве".to_string()),
-        };
-        let src_ffprobe = match found_ffprobe {
-            Some(p) => p,
-            None => return Err("ffprobe.exe не найден в распакованном архиве".to_string()),
-        };
 
         let target_ffmpeg = ffmpeg_bin_dir.join("ffmpeg.exe");
         let target_ffprobe = ffmpeg_bin_dir.join("ffprobe.exe");
 
-        let _ = std::fs::remove_file(&target_ffmpeg);
-        let _ = std::fs::remove_file(&target_ffprobe);
+        let temp_ffmpeg = ffmpeg_bin_dir.join("ffmpeg.download.exe");
+        let temp_ffprobe = ffmpeg_bin_dir.join("ffprobe.download.exe");
 
-        std::fs::copy(&src_ffmpeg, &target_ffmpeg).map_err(|e| format!("Не удалось скопировать ffmpeg.exe: {}", e))?;
-        std::fs::copy(&src_ffprobe, &target_ffprobe).map_err(|e| format!("Не удалось скопировать ffprobe.exe: {}", e))?;
+        let _ = std::fs::remove_file(&temp_ffmpeg);
+        let _ = std::fs::remove_file(&temp_ffprobe);
 
-        let _ = std::fs::remove_file(&temp_zip);
-        let _ = std::fs::remove_dir_all(&extract_dir);
+        // Primary source: exact implementation from imsyy/yt-dlp-gui
+        // Prebuilt standalone static binaries from eugeneware/ffmpeg-static
+        let ffmpeg_url = "https://github.com/eugeneware/ffmpeg-static/releases/latest/download/ffmpeg-win32-x64";
+        let ffprobe_url = "https://github.com/eugeneware/ffmpeg-static/releases/latest/download/ffprobe-win32-x64";
 
-        let mut verify_cmd = Command::new(&target_ffmpeg);
-        #[cfg(windows)]
-        verify_cmd.creation_flags(CREATE_NO_WINDOW);
-        verify_cmd.arg("-version");
-        let ver = match verify_cmd.output() {
-            Ok(out) if out.status.success() => {
-                let s = String::from_utf8_lossy(&out.stdout);
-                s.replace("ffmpeg version ", "").split_whitespace().next().unwrap_or("Ready").to_string()
+        let primary_res: Result<(), String> = (|| {
+            // [1/2] Download & verify FFmpeg (0% .. 48%)
+            self.download_file_with_curl(
+                "ffmpeg",
+                ffmpeg_url,
+                &temp_ffmpeg,
+                300,
+                78.9,
+                0,
+                48,
+                "[1/2] Скачивание FFmpeg",
+            )?;
+
+            self.emit_component_progress("ffmpeg", "Проверка FFmpeg...", 49);
+            Self::verify_executable(&temp_ffmpeg, "-version")
+                .map_err(|e| format!("FFmpeg поврежден или не запускается: {}", e))?;
+
+            // [2/2] Download & verify FFprobe (50% .. 95%)
+            self.download_file_with_curl(
+                "ffmpeg",
+                ffprobe_url,
+                &temp_ffprobe,
+                300,
+                78.8,
+                50,
+                95,
+                "[2/2] Скачивание FFprobe",
+            )?;
+
+            self.emit_component_progress("ffmpeg", "Проверка FFprobe...", 96);
+            Self::verify_executable(&temp_ffprobe, "-version")
+                .map_err(|e| format!("FFprobe поврежден или не запускается: {}", e))?;
+
+            self.emit_component_progress("ffmpeg", "Сохранение FFmpeg & FFprobe...", 98);
+            Self::replace_executable(&temp_ffmpeg, &target_ffmpeg)?;
+            Self::replace_executable(&temp_ffprobe, &target_ffprobe)?;
+
+            Ok(())
+        })();
+
+        // Fallback strategy if direct download fails: use fast ffbinaries prebuilt zips
+        if primary_res.is_err() {
+            let _ = std::fs::remove_file(&temp_ffmpeg);
+            let _ = std::fs::remove_file(&temp_ffprobe);
+
+            self.emit_component_progress("ffmpeg", "Резервная загрузка FFmpeg...", 10);
+            let ffbin_ffmpeg_url = "https://github.com/ffbinaries/ffbinaries-prebuilt/releases/download/v6.1/ffmpeg-6.1-win-64.zip";
+            let ffbin_ffprobe_url = "https://github.com/ffbinaries/ffbinaries-prebuilt/releases/download/v6.1/ffprobe-6.1-win-64.zip";
+
+            let temp_ffmpeg_zip = temp_dir.join("ffmpeg_fb.download.zip");
+            let temp_ffprobe_zip = temp_dir.join("ffprobe_fb.download.zip");
+            let extract_ffmpeg_dir = temp_dir.join("ffmpeg_fb_extract");
+            let extract_ffprobe_dir = temp_dir.join("ffprobe_fb_extract");
+
+            let _ = std::fs::remove_file(&temp_ffmpeg_zip);
+            let _ = std::fs::remove_file(&temp_ffprobe_zip);
+            let _ = std::fs::remove_dir_all(&extract_ffmpeg_dir);
+            let _ = std::fs::remove_dir_all(&extract_ffprobe_dir);
+
+            self.download_file_with_curl(
+                "ffmpeg",
+                ffbin_ffmpeg_url,
+                &temp_ffmpeg_zip,
+                300,
+                52.1,
+                10,
+                50,
+                "[Резерв 1/2] Скачивание FFmpeg",
+            )?;
+
+            self.download_file_with_curl(
+                "ffmpeg",
+                ffbin_ffprobe_url,
+                &temp_ffprobe_zip,
+                300,
+                52.1,
+                50,
+                85,
+                "[Резерв 2/2] Скачивание FFprobe",
+            )?;
+
+            self.emit_component_progress("ffmpeg", "Распаковка резервных архивов...", 88);
+            Self::extract_archive_zip(&temp_ffmpeg_zip, &extract_ffmpeg_dir)?;
+            Self::extract_archive_zip(&temp_ffprobe_zip, &extract_ffprobe_dir)?;
+
+            let src_ffmpeg = extract_ffmpeg_dir.join("ffmpeg.exe");
+            let src_ffprobe = extract_ffprobe_dir.join("ffprobe.exe");
+
+            if !src_ffmpeg.exists() || !src_ffprobe.exists() {
+                return Err("Исполняемые файлы FFmpeg/FFprobe не найдены в архивах".to_string());
             }
+
+            Self::replace_executable(&src_ffmpeg, &target_ffmpeg)?;
+            Self::replace_executable(&src_ffprobe, &target_ffprobe)?;
+
+            let _ = std::fs::remove_file(&temp_ffmpeg_zip);
+            let _ = std::fs::remove_file(&temp_ffprobe_zip);
+            let _ = std::fs::remove_dir_all(&extract_ffmpeg_dir);
+            let _ = std::fs::remove_dir_all(&extract_ffprobe_dir);
+        }
+
+        self.emit_component_progress("ffmpeg", "Проверка установленных FFmpeg & FFprobe...", 99);
+        let ver = match Self::verify_executable(&target_ffmpeg, "-version") {
+            Ok(s) => s.replace("ffmpeg version ", "").split_whitespace().next().unwrap_or("Ready").to_string(),
             _ => "Ready".to_string(),
         };
 
         let mut cfg = AppConfig::load();
         cfg.ffmpeg_dir = ffmpeg_bin_dir.to_string_lossy().to_string();
         cfg.save();
+
+        self.emit_component_progress("ffmpeg", "FFmpeg & FFprobe успешно установлены!", 100);
 
         Ok(json!({
             "ok": true,
@@ -615,7 +787,7 @@ impl Api {
                 }
             }
             "ffmpeg" => {
-                self.emit_component_progress("ffmpeg", "Загрузка архива FFmpeg & FFprobe...", 10);
+                self.emit_component_progress("ffmpeg", "Загрузка FFmpeg & FFprobe...", 10);
                 match self.install_ffmpeg(&bin_dir, &temp_dir) {
                     Ok(val) => {
                         self.emit_component_progress("ffmpeg", "FFmpeg & FFprobe успешно установлены!", 100);

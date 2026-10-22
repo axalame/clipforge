@@ -1430,6 +1430,41 @@
       color: var(--text-muted);
       line-height: 1.4;
     }
+    .banner-progress-box,
+    .tool-progress-box {
+      width: 100%;
+      margin-top: 10px;
+      padding: 0;
+      background: transparent !important;
+      border: none !important;
+    }
+    body.theme-light .banner-progress-box,
+    body.theme-light .tool-progress-box {
+      background: transparent !important;
+      border: none !important;
+    }
+    .progress-info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12.5px;
+      color: var(--text-main);
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+    .progress-msg {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--text-main);
+    }
+    .progress-pct {
+      font-family: monospace;
+      font-weight: 700;
+      color: #2080f0;
+      margin-left: 12px;
+      flex-shrink: 0;
+    }
     .yt-missing-tools-alert {
       display: flex;
       align-items: center;

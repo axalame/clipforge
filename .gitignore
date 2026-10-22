@@ -34,6 +34,7 @@ pnpm-debug.log*
 video_studio.exe
 clipforge.exe
 *.exe
+*.old
 video_studio.exe.WebView2/
 *.WebView2/
 *.pdb
