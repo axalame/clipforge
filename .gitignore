@@ -52,3 +52,10 @@ desktop.ini
 .vscode/
 *.suo
 *.user
+
+# 7. Local Developer Scripts & Agent Rules
+dev.bat
+fast-test.bat
+GEMINI.md
+AGENTS.md
+/docs/agents/
