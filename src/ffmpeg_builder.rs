@@ -662,6 +662,79 @@ impl FFmpegBuilder {
                 Ok((cmd, target_out))
             }
 
+            "extract_audio" => {
+                let format = params["format"].as_str().unwrap_or("mp3").to_lowercase();
+                let bitrate = params["bitrate"].as_str().unwrap_or("320k");
+
+                match format.as_str() {
+                    "wav" => {
+                        let target_out = output_path
+                            .map(|s| s.to_string())
+                            .unwrap_or_else(|| get_output_path(input_path, "audio", &out_dir, Some("wav")));
+
+                        cmd.extend(vec![
+                            "-i".to_string(),
+                            input_path.to_string(),
+                            "-vn".to_string(),
+                            "-c:a".to_string(),
+                            "pcm_s16le".to_string(),
+                            target_out.clone(),
+                        ]);
+                        Ok((cmd, target_out))
+                    }
+                    "copy" => {
+                        let ext = params["ext"].as_str().unwrap_or("m4a");
+                        let target_out = output_path
+                            .map(|s| s.to_string())
+                            .unwrap_or_else(|| get_output_path(input_path, "audio", &out_dir, Some(ext)));
+
+                        cmd.extend(vec![
+                            "-i".to_string(),
+                            input_path.to_string(),
+                            "-vn".to_string(),
+                            "-c:a".to_string(),
+                            "copy".to_string(),
+                            target_out.clone(),
+                        ]);
+                        Ok((cmd, target_out))
+                    }
+                    _ => {
+                        // default mp3
+                        let target_out = output_path
+                            .map(|s| s.to_string())
+                            .unwrap_or_else(|| get_output_path(input_path, "audio", &out_dir, Some("mp3")));
+
+                        cmd.extend(vec![
+                            "-i".to_string(),
+                            input_path.to_string(),
+                            "-vn".to_string(),
+                            "-c:a".to_string(),
+                            "libmp3lame".to_string(),
+                            "-b:a".to_string(),
+                            bitrate.to_string(),
+                            target_out.clone(),
+                        ]);
+                        Ok((cmd, target_out))
+                    }
+                }
+            }
+
+            "mute_video" | "remove_audio" => {
+                let target_out = output_path
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|| get_output_path(input_path, "muted", &out_dir, None));
+
+                cmd.extend(vec![
+                    "-i".to_string(),
+                    input_path.to_string(),
+                    "-an".to_string(),
+                    "-c:v".to_string(),
+                    "copy".to_string(),
+                    target_out.clone(),
+                ]);
+                Ok((cmd, target_out))
+            }
+
             "compress" => {
                 let codec = params["codec"].as_str().unwrap_or("libx264");
                 let preset = params["preset"].as_str().unwrap_or("medium");
@@ -1056,6 +1129,48 @@ mod tests {
         let af_idx = cmd.iter().position(|s| s == "-af").unwrap();
         let af_val = &cmd[af_idx + 1];
         assert_eq!(af_val, "loudnorm=I=-14.0:TP=-1.0:LRA=9.5");
+    }
+
+    #[test]
+    fn test_extract_audio_mp3_and_wav() {
+        let builder = FFmpegBuilder::new();
+
+        // MP3 test
+        let (cmd_mp3, out_mp3) = builder.build_command("extract_audio", "video.mp4", &json!({
+            "format": "mp3",
+            "bitrate": "256k"
+        }), None).unwrap();
+        assert!(cmd_mp3.contains(&"-vn".to_string()));
+        assert!(cmd_mp3.contains(&"libmp3lame".to_string()));
+        assert!(cmd_mp3.contains(&"256k".to_string()));
+        assert!(out_mp3.ends_with("video_audio.mp3"));
+
+        // WAV test
+        let (cmd_wav, out_wav) = builder.build_command("extract_audio", "video.mp4", &json!({
+            "format": "wav"
+        }), None).unwrap();
+        assert!(cmd_wav.contains(&"-vn".to_string()));
+        assert!(cmd_wav.contains(&"pcm_s16le".to_string()));
+        assert!(out_wav.ends_with("video_audio.wav"));
+
+        // Copy test
+        let (cmd_copy, out_copy) = builder.build_command("extract_audio", "video.mp4", &json!({
+            "format": "copy",
+            "ext": "opus"
+        }), None).unwrap();
+        assert!(cmd_copy.contains(&"-vn".to_string()));
+        assert!(cmd_copy.contains(&"copy".to_string()));
+        assert!(out_copy.ends_with("video_audio.opus"));
+    }
+
+    #[test]
+    fn test_mute_video_command() {
+        let builder = FFmpegBuilder::new();
+        let (cmd, out) = builder.build_command("mute_video", "video.mp4", &json!({}), None).unwrap();
+        assert!(cmd.contains(&"-an".to_string()));
+        assert!(cmd.contains(&"-c:v".to_string()));
+        assert!(cmd.contains(&"copy".to_string()));
+        assert!(out.ends_with("video_muted.mp4"));
     }
 
     #[test]

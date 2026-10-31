@@ -26,5 +26,20 @@
   "new_audio_label": "New audio file (MP3, WAV, AAC, FLAC):",
   "choose_audio_file": "Select audio file...",
   "btn_replace_audio": "Replace Audio Track",
-  "msg_no_audio_file": "Please select audio file!"
+  "msg_no_audio_file": "Please select audio file!",
+  "sub_audio_extract": "Extract Audio",
+  "sub_audio_mute": "Mute Video",
+  "extract_audio_title": "Extract Audio Track from Video",
+  "extract_audio_desc": "Extract audio stream from video and save as a standalone MP3 or WAV audio file without video.",
+  "extract_format_label": "Audio format:",
+  "extract_format_mp3_desc": "MP3 — universal compressed format with adjustable bitrate for players and social media.",
+  "extract_format_wav_desc": "WAV — uncompressed studio quality (16-bit PCM) with zero quality loss.",
+  "extract_format_copy_desc": "Copy — fast direct stream dump without re-encoding (instant).",
+  "bitrate_label": "MP3 Bitrate:",
+  "btn_extract_file": "Extract Audio",
+  "btn_extract_queue": "Batch Extract for Queue",
+  "mute_video_title": "Remove Audio from Video (Mute)",
+  "mute_video_desc": "Creates a video copy without audio tracks. Video stream is copied directly without re-encoding (instant with zero quality loss).",
+  "btn_mute_file": "Remove Audio from Video",
+  "btn_mute_queue": "Mute All in Queue"
 }

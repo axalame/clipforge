@@ -4,6 +4,8 @@
       <button class="subtab-btn" :class="{ 'is-active': subAudio === 'loudnorm' }" @click="subAudio = 'loudnorm'">{{ t('sub_audio_loudnorm') }}</button>
       <button class="subtab-btn" :class="{ 'is-active': subAudio === 'silence' }" @click="subAudio = 'silence'">{{ t('sub_audio_silence') }}</button>
       <button class="subtab-btn" :class="{ 'is-active': subAudio === 'replace' }" @click="subAudio = 'replace'">{{ t('sub_audio_replace') }}</button>
+      <button class="subtab-btn" :class="{ 'is-active': subAudio === 'extract' }" @click="subAudio = 'extract'">{{ t('sub_audio_extract') }}</button>
+      <button class="subtab-btn" :class="{ 'is-active': subAudio === 'mute' }" @click="subAudio = 'mute'">{{ t('sub_audio_mute') }}</button>
     </div>
 
     <!-- Loudnorm -->
@@ -119,6 +121,80 @@
       </div>
       <n-button type="primary" @click="runOp('replace_audio')">{{ t('btn_replace_audio') }}</n-button>
     </div>
+
+    <!-- Extract Audio -->
+    <div v-if="subAudio === 'extract'" class="studio-panel">
+      <div class="panel-header">
+        <span>{{ t('extract_audio_title') }}</span>
+        <n-tag size="small" type="info" round>{{ extractForm.format.toUpperCase() }} {{ extractForm.format === 'mp3' ? extractForm.bitrate : '' }}</n-tag>
+      </div>
+
+      <div style="font-size:13px; color:var(--text-muted); margin-bottom:16px;">
+        {{ t('extract_audio_desc') }}
+      </div>
+
+      <!-- Format Selection -->
+      <div class="form-field" style="margin-bottom:16px; background:var(--bg-panel-subtle); padding:12px; border-radius:6px; border:1px solid var(--border-color);">
+        <label class="field-label">{{ t('extract_format_label') }}</label>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px;">
+          <n-button size="small" :secondary="extractForm.format !== 'mp3'" :type="extractForm.format === 'mp3' ? 'primary' : 'default'" @click="extractForm.format = 'mp3'">
+            MP3 (Универсальный)
+          </n-button>
+          <n-button size="small" :secondary="extractForm.format !== 'wav'" :type="extractForm.format === 'wav' ? 'primary' : 'default'" @click="extractForm.format = 'wav'">
+            WAV (Студийный Lossless)
+          </n-button>
+          <n-button size="small" :secondary="extractForm.format !== 'copy'" :type="extractForm.format === 'copy' ? 'primary' : 'default'" @click="extractForm.format = 'copy'">
+            Copy (Без пережатия)
+          </n-button>
+        </div>
+        <div style="font-size:11.5px; color:var(--text-sub); margin-top:8px;">
+          <span v-if="extractForm.format === 'mp3'">{{ t('extract_format_mp3_desc') }}</span>
+          <span v-else-if="extractForm.format === 'wav'">{{ t('extract_format_wav_desc') }}</span>
+          <span v-else>{{ t('extract_format_copy_desc') }}</span>
+        </div>
+      </div>
+
+      <!-- Bitrate for MP3 -->
+      <div v-if="extractForm.format === 'mp3'" class="form-field" style="margin-bottom:18px;">
+        <label class="field-label">{{ t('bitrate_label') }}</label>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px;">
+          <n-button size="small" :secondary="extractForm.bitrate !== '320k'" :type="extractForm.bitrate === '320k' ? 'primary' : 'default'" @click="extractForm.bitrate = '320k'">
+            320 kbps (HQ)
+          </n-button>
+          <n-button size="small" :secondary="extractForm.bitrate !== '256k'" :type="extractForm.bitrate === '256k' ? 'primary' : 'default'" @click="extractForm.bitrate = '256k'">
+            256 kbps
+          </n-button>
+          <n-button size="small" :secondary="extractForm.bitrate !== '192k'" :type="extractForm.bitrate === '192k' ? 'primary' : 'default'" @click="extractForm.bitrate = '192k'">
+            192 kbps (Standard)
+          </n-button>
+          <n-button size="small" :secondary="extractForm.bitrate !== '128k'" :type="extractForm.bitrate === '128k' ? 'primary' : 'default'" @click="extractForm.bitrate = '128k'">
+            128 kbps (Compact)
+          </n-button>
+        </div>
+      </div>
+
+      <n-flex :size="10">
+        <n-button type="primary" @click="runOp('extract_audio')">{{ t('btn_extract_file') }}</n-button>
+        <n-button secondary @click="runBatch('extract_audio')">{{ t('btn_extract_queue') }}</n-button>
+      </n-flex>
+    </div>
+
+    <!-- Mute Video -->
+    <div v-if="subAudio === 'mute'" class="studio-panel">
+      <div class="panel-header">
+        <span>{{ t('mute_video_title') }}</span>
+        <n-tag size="small" type="warning" round>Direct Stream Copy</n-tag>
+      </div>
+
+      <div style="font-size:13px; color:var(--text-muted); margin-bottom:18px; line-height:1.5;">
+        {{ t('mute_video_desc') }}
+      </div>
+
+      <n-flex :size="10">
+        <n-button type="primary" @click="runOp('mute_video')">{{ t('btn_mute_file') }}</n-button>
+        <n-button secondary @click="runBatch('mute_video')">{{ t('btn_mute_queue') }}</n-button>
+      </n-flex>
+    </div>
   </div>
 </template>
 
@@ -143,7 +219,12 @@ const message = useMessage();
 const queueStore = useQueueStore();
 const configStore = useConfigStore();
 
-const subAudio = ref<"loudnorm" | "silence" | "replace">("loudnorm");
+const subAudio = ref<"loudnorm" | "silence" | "replace" | "extract" | "mute">("loudnorm");
+
+const extractForm = ref({
+  format: "mp3",
+  bitrate: "320k",
+});
 
 const loudnormForm = ref({
   preset: "-14",
@@ -204,6 +285,16 @@ const buildParams = (op: string) => {
       return null;
     }
     p.audio_file = audioForm.value.path;
+  } else if (op === "extract_audio") {
+    p.format = extractForm.value.format;
+    p.bitrate = extractForm.value.bitrate;
+    const codec = (queueStore.activeTechSpecs?.audio_codec || "").toLowerCase();
+    if (codec === "aac") p.ext = "m4a";
+    else if (codec === "opus") p.ext = "opus";
+    else if (codec === "mp3") p.ext = "mp3";
+    else if (codec === "flac") p.ext = "flac";
+  } else if (op === "mute_video") {
+    // Direct stream copy without audio
   }
   return p;
 };
